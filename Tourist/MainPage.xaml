@@ -1,0 +1,83 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:maps="clr-namespace:Microsoft.Maui.Controls.Maps;assembly=Microsoft.Maui.Controls.Maps"
+             x:Class="Tourist.MainPage"
+             Title="Du Lịch - Tìm Địa Điểm">
+
+    <Grid>
+
+        <!-- MAP FULL SCREEN -->
+        <maps:Map x:Name="touristMap"
+                  IsShowingUser="True"
+                  HorizontalOptions="FillAndExpand"
+                  VerticalOptions="FillAndExpand" />
+
+        <!-- BOTTOM SHEET -->
+        <Frame x:Name="BottomSheet"
+               BackgroundColor="White"
+               CornerRadius="20"
+               Padding="10"
+               HasShadow="True"
+               VerticalOptions="End"
+               HeightRequest="300"
+               TranslationY="200">
+            <Frame.GestureRecognizers>
+                <PanGestureRecognizer PanUpdated="OnPanUpdated"/>
+            </Frame.GestureRecognizers>
+
+            <Grid RowDefinitions="Auto,*,Auto">
+
+                <!-- Thanh kéo nhỏ -->
+                <BoxView HeightRequest="5"
+                         WidthRequest="50"
+                         BackgroundColor="Gray"
+                         HorizontalOptions="Center"
+                         CornerRadius="3"
+                         Margin="0,0,0,10"/>
+
+                <!-- CollectionView hiển thị POI -->
+                <CollectionView Grid.Row="1"
+                                x:Name="PoiCollectionView"
+                                SelectionMode="Single">
+                    <CollectionView.ItemsLayout>
+                        <LinearItemsLayout Orientation="Horizontal" ItemSpacing="5" />
+                    </CollectionView.ItemsLayout>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate>
+                            <Frame BorderColor="#DDD" CornerRadius="8" Padding="10" Margin="5,5,2,5" MinimumWidthRequest="140" BackgroundColor="White">
+                                <StackLayout Spacing="2">
+                                    <Label Text="{Binding POIName, StringFormat='📍 {0}'}" FontSize="11" FontAttributes="Bold" LineBreakMode="TailTruncation" />
+                                    <Label Text="{Binding Category, StringFormat='🏷️ {0}'}" FontSize="9" TextColor="#666" LineBreakMode="TailTruncation" />
+                                    <Label Text="{Binding Address}" FontSize="8" TextColor="#999" LineBreakMode="TailTruncation" />
+                                </StackLayout>
+                            </Frame>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+
+                <!-- Controls -->
+                <StackLayout Grid.Row="2" Spacing="8">
+
+                    <!-- Picker và Entry -->
+                    <StackLayout Orientation="Horizontal" Spacing="5">
+                        <Picker x:Name="LocationPicker" Title="📍 Vị trí" SelectedIndexChanged="OnLocationChanged" HorizontalOptions="FillAndExpand" />
+                        <Picker x:Name="LanguagePicker" Title="🌐 Ngôn ngữ" SelectedIndexChanged="OnLanguageChanged" HorizontalOptions="FillAndExpand" />
+                        <Entry x:Name="RadiusEntry" Placeholder="km" Keyboard="Numeric" Text="2" WidthRequest="50" />
+                    </StackLayout>
+
+                    <!-- Buttons -->
+                    <StackLayout Orientation="Horizontal" Spacing="5">
+                        <Button x:Name="SearchButton" Text="🔍 Tìm" Clicked="OnSearchClicked" BackgroundColor="#2196F3" TextColor="White" HorizontalOptions="FillAndExpand" />
+                        <Button x:Name="DetailButton" Text="📋 Chi Tiết" Clicked="OnShowDetails" BackgroundColor="#4CAF50" TextColor="White" HorizontalOptions="FillAndExpand" />
+                        <Button x:Name="SpeakButton" Text="🔊 Nghe" Clicked="OnSpeak" BackgroundColor="#FF9800" TextColor="White" HorizontalOptions="FillAndExpand" />
+                        <Button x:Name="RefreshButton" Text="🔄 Làm Mới" Clicked="OnRefresh" BackgroundColor="#9C27B0" TextColor="White" HorizontalOptions="FillAndExpand" />
+                    </StackLayout>
+
+                </StackLayout>
+
+            </Grid>
+        </Frame>
+
+    </Grid>
+</ContentPage>

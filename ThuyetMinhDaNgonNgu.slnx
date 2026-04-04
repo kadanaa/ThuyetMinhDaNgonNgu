@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+  </Folder>
+  <Project Path="Admin/Admin.csproj" />
+  <Project Path="POIOwner/POIOwner.csproj" />
+  <Project Path="Tourist/Tourist.csproj">
+    <Deploy Solution="Debug|*" />
+  </Project>
+</Solution>
