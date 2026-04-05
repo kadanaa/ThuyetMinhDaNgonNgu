@@ -24,7 +24,7 @@ BEGIN
         [PasswordHash] NVARCHAR(MAX) NOT NULL,
         [Email] NVARCHAR(100) NOT NULL UNIQUE,
         [FullName] NVARCHAR(200),
-        [Role] NVARCHAR(50) NOT NULL, -- 'Admin', 'POIOwner'
+        [Role] NVARCHAR(50) NOT NULL CHECK ([Role] IN ('Admin', 'POIOwner')),
         [PhoneNumber] NVARCHAR(20),
         [IsActive] BIT DEFAULT 1,
         [CreatedDate] DATETIME DEFAULT GETUTCDATE(),
@@ -49,7 +49,7 @@ BEGIN
         [Description] NVARCHAR(MAX), -- Mô tả thuyết minh bằng tiếng Việt
         [Latitude] DECIMAL(10, 8) NOT NULL, -- Tọa độ X (Latitude)
         [Longitude] DECIMAL(11, 8) NOT NULL, -- Tọa độ Y (Longitude)
-        [Radius] FLOAT NOT NULL, -- Bán kính r (tính bằng mét)
+        [Radius] FLOAT NOT NULL, -- Bán kính r (tính bằng KM, ví dụ: 0.5 = 500m)
         [Category] NVARCHAR(50), -- Loại địa điểm: 'Restaurant', 'Cafe', 'Shop', 'Tourism', v.v.
         [Address] NVARCHAR(300),
         [PhoneNumber] NVARCHAR(20),
@@ -265,16 +265,42 @@ BEGIN
     INSERT INTO [dbo].[PointsOfInterest] 
         ([POIName], [Description], [Latitude], [Longitude], [Radius], [Category], [Address], [PhoneNumber], [OwnerId], [IsApproved], [Status])
     VALUES 
-        ('Phở Bắc Hà', 'Quán phở nổi tiếng với nước dùng được nấu trong 12 tiếng. Phục vụ phở bò ngon lành với giá hợp lý. Mở từ 5h sáng đến 11h đêm. Nước phở thơm ngon, thịt bò mềm, bánh phở chứng thực được chỉnh qua nước lạnh nhiều lần.', 21.028511, 105.854100, 500, 'Restaurant', '45 Hàng Manh, Hoàn Kiếm, Hà Nội', '024 3938 1485', 2, 1, 'Active'),
-        ('Cafe Trời Xanh', 'Cafe nhỏ xinh với không gian thoáng mát, thích hợp để học tập hoặc gặp gỡ bạn bè. Cà phê được rang tại chỗ hàng ngày. Phục vụ các loại đồ uống từ cà phê, trà, nước ép trái cây tươi. Có WiFi miễn phí và điều hòa.', 21.027500, 105.853800, 400, 'Cafe', '23 Cửa Bắc, Hoàn Kiếm, Hà Nội', '024 3935 9283', 2, 1, 'Active'),
-        ('Tạp Hóa Minh Phúc', 'Cửa hàng tạp hóa đầy đủ các mặt hàng ăn uống, mỹ phẩm, nước rửa tay, mặt nạ y tế, và các sản phẩm tiêu dùng hàng ngày khác. Mở từ 6h sáng đến 11h đêm hàng ngày.', 21.029000, 105.855200, 300, 'Shop', '67 Hàng Bông, Hoàn Kiếm, Hà Nội', '024 3936 2015', 2, 1, 'Active');
+        ('Phở Bắc Hà', 'Quán phở nổi tiếng với nước dùng được nấu trong 12 tiếng. Phục vụ phở bò ngon lành với giá hợp lý. Mở từ 5h sáng đến 11h đêm. Nước phở thơm ngon, thịt bò mềm, bánh phở chứng thực được chỉnh qua nước lạnh nhiều lần.', 21.028511, 105.854100, 0.5, 'Restaurant', '45 Hàng Manh, Hoàn Kiếm, Hà Nội', '024 3938 1485', 2, 1, 'Active'),
+        ('Cafe Trời Xanh', 'Cafe nhỏ xinh với không gian thoáng mát, thích hợp để học tập hoặc gặp gỡ bạn bè. Cà phê được rang tại chỗ hàng ngày. Phục vụ các loại đồ uống từ cà phê, trà, nước ép trái cây tươi. Có WiFi miễn phí và điều hòa.', 21.027500, 105.853800, 0.4, 'Cafe', '23 Cửa Bắc, Hoàn Kiếm, Hà Nội', '024 3935 9283', 2, 1, 'Active'),
+        ('Tạp Hóa Minh Phúc', 'Cửa hàng tạp hóa đầy đủ các mặt hàng ăn uống, mỹ phẩm, nước rửa tay, mặt nạ y tế, và các sản phẩm tiêu dùng hàng ngày khác. Mở từ 6h sáng đến 11h đêm hàng ngày.', 21.029000, 105.855200, 0.3, 'Shop', '67 Hàng Bông, Hoàn Kiếm, Hà Nội', '024 3936 2015', 2, 1, 'Active');
 END
 GO
 
 -- Create View for POI with Owner Information
-IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[vw_POIWithOwner]') AND type in (N'V'))
+CREATE OR ALTER VIEW [dbo].[vw_POIWithOwner] AS
+SELECT 
+    p.[POIId],
+    p.[POIName],
+    p.[Description],
+    p.[Latitude],
+    p.[Longitude],
+    p.[Radius],
+    p.[Category],
+    p.[Address],
+    p.[PhoneNumber],
+    p.[Website],
+    p.[OwnerId],
+    u.[FullName] AS [OwnerName],
+    u.[Email] AS [OwnerEmail],
+    p.[IsApproved],
+    p.[Status],
+    p.[CreatedDate],
+    p.[LastModifiedDate]
+FROM [dbo].[PointsOfInterest] p
+LEFT JOIN [dbo].[Users] u ON p.[OwnerId] = u.[UserId];
+GO
+
+-- Stored Procedure: Get POI near location (dùng POI.Radius làm ngưỡng lọc)
+CREATE OR ALTER PROCEDURE [dbo].[sp_GetPOINearLocation]
+    @Latitude DECIMAL(10, 8),
+    @Longitude DECIMAL(11, 8)
+AS
 BEGIN
-    CREATE VIEW [dbo].[vw_POIWithOwner] AS
     SELECT 
         p.[POIId],
         p.[POIName],
@@ -286,70 +312,45 @@ BEGIN
         p.[Address],
         p.[PhoneNumber],
         p.[Website],
-        p.[OwnerId],
-        u.[FullName] AS [OwnerName],
-        u.[Email] AS [OwnerEmail],
-        p.[IsApproved],
-        p.[Status],
-        p.[CreatedDate],
-        p.[LastModifiedDate]
+        (6371 * ACOS(
+            COS(RADIANS(@Latitude)) * COS(RADIANS(p.[Latitude])) *
+            COS(RADIANS(p.[Longitude]) - RADIANS(@Longitude)) +
+            SIN(RADIANS(@Latitude)) * SIN(RADIANS(p.[Latitude]))
+        )) AS [DistanceKm]
     FROM [dbo].[PointsOfInterest] p
-    LEFT JOIN [dbo].[Users] u ON p.[OwnerId] = u.[UserId];
+    WHERE p.[IsApproved] = 1
+      AND p.[Status] = 'Active'
+      AND (6371 * ACOS(
+            COS(RADIANS(@Latitude)) * COS(RADIANS(p.[Latitude])) *
+            COS(RADIANS(p.[Longitude]) - RADIANS(@Longitude)) +
+            SIN(RADIANS(@Latitude)) * SIN(RADIANS(p.[Latitude]))
+          )) <= p.[Radius]
+    ORDER BY [DistanceKm] ASC;
 END
 GO
 
--- Create Stored Procedure: Get POI near location
-IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[sp_GetPOINearLocation]') AND type in (N'P'))
+-- Stored Procedure: Create POI Approval Request
+CREATE OR ALTER PROCEDURE [dbo].[sp_CreatePOIApprovalRequest]
+    @POIId INT,
+    @OwnerId INT,
+    @RequestType NVARCHAR(50),
+    @RequestData NVARCHAR(MAX)
+AS
 BEGIN
-    CREATE PROCEDURE [dbo].[sp_GetPOINearLocation]
-        @Latitude DECIMAL(10, 8),
-        @Longitude DECIMAL(11, 8),
-        @Distance FLOAT = 5000 -- Khoảng cách mặc định 5000m
-    AS
-    BEGIN
-        SELECT 
-            p.[POIId],
-            p.[POIName],
-            p.[Description],
-            p.[Latitude],
-            p.[Longitude],
-            p.[Radius],
-            p.[Category],
-            p.[Address],
-            p.[PhoneNumber],
-            p.[Website],
-            -- Tính khoảng cách (Haversine formula)
-            (6371 * ACOS(COS(RADIANS(90 - @Latitude)) * COS(RADIANS(90 - p.[Latitude])) + 
-             SIN(RADIANS(90 - @Latitude)) * SIN(RADIANS(90 - p.[Latitude])) * COS(RADIANS(@Longitude - p.[Longitude])))) * 1000 AS [DistanceMeters]
-        FROM [dbo].[PointsOfInterest] p
-        WHERE p.[IsApproved] = 1 AND p.[Status] = 'Active'
-        ORDER BY [DistanceMeters] ASC;
-    END
-END
-GO
+    INSERT INTO [dbo].[POIApprovalRequests] ([POIId], [OwnerId], [RequestType], [RequestData])
+    VALUES (@POIId, @OwnerId, @RequestType, @RequestData);
 
--- Create Stored Procedure: Create POI Approval Request
-IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[sp_CreatePOIApprovalRequest]') AND type in (N'P'))
-BEGIN
-    CREATE PROCEDURE [dbo].[sp_CreatePOIApprovalRequest]
-        @POIId INT,
-        @OwnerId INT,
-        @RequestType NVARCHAR(50),
-        @RequestData NVARCHAR(MAX)
-    AS
-    BEGIN
-        INSERT INTO [dbo].[POIApprovalRequests] ([POIId], [OwnerId], [RequestType], [RequestData])
-        VALUES (@POIId, @OwnerId, @RequestType, @RequestData);
-
-        SELECT SCOPE_IDENTITY() AS [NewRequestId];
-    END
+    SELECT SCOPE_IDENTITY() AS [NewRequestId];
 END
 GO
 
 -- =============================================
 -- INDEXES FOR PERFORMANCE
 -- =============================================
-CREATE NONCLUSTERED INDEX IX_POI_Status_Approved ON [dbo].[PointsOfInterest]([Status], [IsApproved]) WHERE [IsApproved] = 1;
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_POI_Status_Approved')
+BEGIN
+    CREATE NONCLUSTERED INDEX IX_POI_Status_Approved ON [dbo].[PointsOfInterest]([Status], [IsApproved]) WHERE [IsApproved] = 1;
+END
 GO
 
 PRINT 'Database creation completed successfully!';

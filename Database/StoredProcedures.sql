@@ -10,26 +10,24 @@ GO
 -- 1. AUTHENTICATION PROCEDURES
 -- =====================================================
 
--- Procedure: Verify login credentials
-IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[sp_VerifyLogin]') AND type in (N'P'))
-BEGIN
-    CREATE PROCEDURE [dbo].[sp_VerifyLogin]
-        @Username NVARCHAR(100),
-        @PasswordHash NVARCHAR(MAX)
+-- Procedure: Get user by username for login
+-- Lưu ý: KHÔNG so sánh password trong SQL vì dùng BCrypt.
+-- Application sẽ nhận PasswordHash về rồi dùng BCrypt.Verify() để kiểm tra.
+CREATE OR ALTER PROCEDURE [dbo].[sp_VerifyLogin]
+        @Username NVARCHAR(100)
     AS
     BEGIN
         SELECT 
             [UserId],
             [Username],
+            [PasswordHash],
             [Email],
             [FullName],
             [Role],
             [IsActive]
         FROM [dbo].[Users]
-        WHERE [Username] = @Username 
-          AND [PasswordHash] = @PasswordHash
+        WHERE [Username] = @Username
           AND [IsActive] = 1;
-    END
 END
 GO
 
@@ -38,9 +36,7 @@ GO
 -- =====================================================
 
 -- Procedure: Get all approved POIs
-IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[sp_GetAllApprovedPOIs]') AND type in (N'P'))
-BEGIN
-    CREATE PROCEDURE [dbo].[sp_GetAllApprovedPOIs]
+CREATE OR ALTER PROCEDURE [dbo].[sp_GetAllApprovedPOIs]
     AS
     BEGIN
         SELECT 
@@ -57,14 +53,11 @@ BEGIN
         FROM [dbo].[PointsOfInterest]
         WHERE [IsApproved] = 1 AND [Status] = 'Active'
         ORDER BY [POIName];
-    END
 END
 GO
 
 -- Procedure: Get POI by ID with all details
-IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[sp_GetPOIById]') AND type in (N'P'))
-BEGIN
-    CREATE PROCEDURE [dbo].[sp_GetPOIById]
+CREATE OR ALTER PROCEDURE [dbo].[sp_GetPOIById]
         @POIId INT
     AS
     BEGIN
@@ -87,20 +80,16 @@ BEGIN
         FROM [dbo].[PointsOfInterest] p
         LEFT JOIN [dbo].[Users] u ON p.[OwnerId] = u.[UserId]
         WHERE p.[POIId] = @POIId;
-    END
 END
 GO
 
--- Procedure: Get POI near specific location with distance calculation
-IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[sp_GetPOINearLocationAdvanced]') AND type in (N'P'))
-BEGIN
-    CREATE PROCEDURE [dbo].[sp_GetPOINearLocationAdvanced]
+-- Procedure: Get POI where tourist is INSIDE each POI's coverage radius
+-- Logic: distance(tourist, POI) <= POI.Radius (km)
+CREATE OR ALTER PROCEDURE [dbo].[sp_GetPOINearLocationAdvanced]
         @Latitude DECIMAL(10, 8),
-        @Longitude DECIMAL(11, 8),
-        @DistanceMeters FLOAT = 5000
+        @Longitude DECIMAL(11, 8)
     AS
     BEGIN
-        -- Using Haversine formula to calculate distance
         SELECT 
             p.[POIId],
             p.[POIName],
@@ -112,25 +101,25 @@ BEGIN
             p.[Address],
             p.[PhoneNumber],
             p.[Website],
-            -- Haversine formula
-            (6371000 * ACOS(COS(RADIANS(90 - @Latitude)) * COS(RADIANS(90 - p.[Latitude])) + 
-             SIN(RADIANS(90 - @Latitude)) * SIN(RADIANS(90 - p.[Latitude])) * 
-             COS(RADIANS(@Longitude - p.[Longitude])))) AS [DistanceMeters]
+            (6371 * ACOS(
+                COS(RADIANS(@Latitude)) * COS(RADIANS(p.[Latitude])) *
+                COS(RADIANS(p.[Longitude]) - RADIANS(@Longitude)) +
+                SIN(RADIANS(@Latitude)) * SIN(RADIANS(p.[Latitude]))
+            )) AS [DistanceKm]
         FROM [dbo].[PointsOfInterest] p
         WHERE p.[IsApproved] = 1 
           AND p.[Status] = 'Active'
-          AND (6371000 * ACOS(COS(RADIANS(90 - @Latitude)) * COS(RADIANS(90 - p.[Latitude])) + 
-               SIN(RADIANS(90 - @Latitude)) * SIN(RADIANS(90 - p.[Latitude])) * 
-               COS(RADIANS(@Longitude - p.[Longitude])))) <= @DistanceMeters
-        ORDER BY [DistanceMeters] ASC;
-    END
+          AND (6371 * ACOS(
+                COS(RADIANS(@Latitude)) * COS(RADIANS(p.[Latitude])) *
+                COS(RADIANS(p.[Longitude]) - RADIANS(@Longitude)) +
+                SIN(RADIANS(@Latitude)) * SIN(RADIANS(p.[Latitude]))
+              )) <= p.[Radius]
+        ORDER BY [DistanceKm] ASC;
 END
 GO
 
 -- Procedure: Get POI by category
-IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[sp_GetPOIByCategory]') AND type in (N'P'))
-BEGIN
-    CREATE PROCEDURE [dbo].[sp_GetPOIByCategory]
+CREATE OR ALTER PROCEDURE [dbo].[sp_GetPOIByCategory]
         @Category NVARCHAR(50)
     AS
     BEGIN
@@ -150,14 +139,11 @@ BEGIN
           AND [IsApproved] = 1 
           AND [Status] = 'Active'
         ORDER BY [POIName];
-    END
 END
 GO
 
 -- Procedure: Create new POI
-IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[sp_CreatePOI]') AND type in (N'P'))
-BEGIN
-    CREATE PROCEDURE [dbo].[sp_CreatePOI]
+CREATE OR ALTER PROCEDURE [dbo].[sp_CreatePOI]
         @POIName NVARCHAR(200),
         @Description NVARCHAR(MAX),
         @Latitude DECIMAL(10, 8),
@@ -179,14 +165,11 @@ BEGIN
              @Category, @Address, @PhoneNumber, @Website, @OwnerId, @IsApproved);
 
         SELECT SCOPE_IDENTITY() AS [NewPOIId];
-    END
 END
 GO
 
 -- Procedure: Update POI
-IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[sp_UpdatePOI]') AND type in (N'P'))
-BEGIN
-    CREATE PROCEDURE [dbo].[sp_UpdatePOI]
+CREATE OR ALTER PROCEDURE [dbo].[sp_UpdatePOI]
         @POIId INT,
         @POIName NVARCHAR(200),
         @Description NVARCHAR(MAX),
@@ -212,14 +195,11 @@ BEGIN
             [Website] = @Website,
             [LastModifiedDate] = GETUTCDATE()
         WHERE [POIId] = @POIId;
-    END
 END
 GO
 
 -- Procedure: Delete POI
-IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[sp_DeletePOI]') AND type in (N'P'))
-BEGIN
-    CREATE PROCEDURE [dbo].[sp_DeletePOI]
+CREATE OR ALTER PROCEDURE [dbo].[sp_DeletePOI]
         @POIId INT
     AS
     BEGIN
@@ -227,7 +207,6 @@ BEGIN
         DELETE FROM [dbo].[POITranslations] WHERE [POIId] = @POIId;
         DELETE FROM [dbo].[POIApprovalRequests] WHERE [POIId] = @POIId;
         DELETE FROM [dbo].[PointsOfInterest] WHERE [POIId] = @POIId;
-    END
 END
 GO
 
@@ -236,9 +215,7 @@ GO
 -- =====================================================
 
 -- Procedure: Get translations for POI
-IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[sp_GetPOITranslations]') AND type in (N'P'))
-BEGIN
-    CREATE PROCEDURE [dbo].[sp_GetPOITranslations]
+CREATE OR ALTER PROCEDURE [dbo].[sp_GetPOITranslations]
         @POIId INT
     AS
     BEGIN
@@ -251,14 +228,11 @@ BEGIN
             [TranslatedName]
         FROM [dbo].[POITranslations]
         WHERE [POIId] = @POIId;
-    END
 END
 GO
 
 -- Procedure: Get translation by language
-IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[sp_GetPOITranslationByLanguage]') AND type in (N'P'))
-BEGIN
-    CREATE PROCEDURE [dbo].[sp_GetPOITranslationByLanguage]
+CREATE OR ALTER PROCEDURE [dbo].[sp_GetPOITranslationByLanguage]
         @POIId INT,
         @LanguageCode NVARCHAR(10)
     AS
@@ -268,14 +242,11 @@ BEGIN
             [TranslatedName]
         FROM [dbo].[POITranslations]
         WHERE [POIId] = @POIId AND [LanguageCode] = @LanguageCode;
-    END
 END
 GO
 
 -- Procedure: Add or update translation
-IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[sp_UpsertPOITranslation]') AND type in (N'P'))
-BEGIN
-    CREATE PROCEDURE [dbo].[sp_UpsertPOITranslation]
+CREATE OR ALTER PROCEDURE [dbo].[sp_UpsertPOITranslation]
         @POIId INT,
         @LanguageCode NVARCHAR(10),
         @LanguageName NVARCHAR(50),
@@ -300,7 +271,6 @@ BEGIN
             VALUES
                 (@POIId, @LanguageCode, @LanguageName, @TranslatedDescription, @TranslatedName);
         END
-    END
 END
 GO
 
@@ -309,9 +279,7 @@ GO
 -- =====================================================
 
 -- Procedure: Get pending approval requests
-IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[sp_GetPendingApprovalRequests]') AND type in (N'P'))
-BEGIN
-    CREATE PROCEDURE [dbo].[sp_GetPendingApprovalRequests]
+CREATE OR ALTER PROCEDURE [dbo].[sp_GetPendingApprovalRequests]
     AS
     BEGIN
         SELECT 
@@ -329,14 +297,11 @@ BEGIN
         JOIN [dbo].[PointsOfInterest] p ON r.[POIId] = p.[POIId]
         WHERE r.[Status] = 'Pending'
         ORDER BY r.[RequestedDate] DESC;
-    END
 END
 GO
 
 -- Procedure: Approve POI request
-IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[sp_ApprovePOIRequest]') AND type in (N'P'))
-BEGIN
-    CREATE PROCEDURE [dbo].[sp_ApprovePOIRequest]
+CREATE OR ALTER PROCEDURE [dbo].[sp_ApprovePOIRequest]
         @RequestId INT,
         @AdminId INT,
         @Comments NVARCHAR(MAX) = NULL
@@ -364,14 +329,11 @@ BEGIN
             [ApprovedBy] = @AdminId,
             [Status] = 'Active'
         WHERE [POIId] = @POIId;
-    END
 END
 GO
 
 -- Procedure: Reject POI request
-IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[sp_RejectPOIRequest]') AND type in (N'P'))
-BEGIN
-    CREATE PROCEDURE [dbo].[sp_RejectPOIRequest]
+CREATE OR ALTER PROCEDURE [dbo].[sp_RejectPOIRequest]
         @RequestId INT,
         @AdminId INT,
         @Comments NVARCHAR(MAX)
@@ -384,7 +346,6 @@ BEGIN
             [ReviewedBy] = @AdminId,
             [AdminComments] = @Comments
         WHERE [RequestId] = @RequestId;
-    END
 END
 GO
 
@@ -393,9 +354,7 @@ GO
 -- =====================================================
 
 -- Procedure: Create new user
-IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[sp_CreateUser]') AND type in (N'P'))
-BEGIN
-    CREATE PROCEDURE [dbo].[sp_CreateUser]
+CREATE OR ALTER PROCEDURE [dbo].[sp_CreateUser]
         @Username NVARCHAR(100),
         @PasswordHash NVARCHAR(MAX),
         @Email NVARCHAR(100),
@@ -410,14 +369,11 @@ BEGIN
             (@Username, @PasswordHash, @Email, @FullName, @Role, @PhoneNumber);
 
         SELECT SCOPE_IDENTITY() AS [NewUserId];
-    END
 END
 GO
 
 -- Procedure: Get user by username
-IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[sp_GetUserByUsername]') AND type in (N'P'))
-BEGIN
-    CREATE PROCEDURE [dbo].[sp_GetUserByUsername]
+CREATE OR ALTER PROCEDURE [dbo].[sp_GetUserByUsername]
         @Username NVARCHAR(100)
     AS
     BEGIN
@@ -432,14 +388,11 @@ BEGIN
             [CreatedDate]
         FROM [dbo].[Users]
         WHERE [Username] = @Username;
-    END
 END
 GO
 
 -- Procedure: Get all POI owners
-IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[sp_GetAllPOIOwners]') AND type in (N'P'))
-BEGIN
-    CREATE PROCEDURE [dbo].[sp_GetAllPOIOwners]
+CREATE OR ALTER PROCEDURE [dbo].[sp_GetAllPOIOwners]
     AS
     BEGIN
         SELECT 
@@ -453,7 +406,6 @@ BEGIN
         FROM [dbo].[Users]
         WHERE [Role] = 'POIOwner'
         ORDER BY [FullName];
-    END
 END
 GO
 
@@ -462,9 +414,7 @@ GO
 -- =====================================================
 
 -- Procedure: Add audit log
-IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[sp_AddAuditLog]') AND type in (N'P'))
-BEGIN
-    CREATE PROCEDURE [dbo].[sp_AddAuditLog]
+CREATE OR ALTER PROCEDURE [dbo].[sp_AddAuditLog]
         @UserId INT,
         @Action NVARCHAR(100),
         @TableName NVARCHAR(50),
@@ -479,14 +429,11 @@ BEGIN
             ([UserId], [Action], [TableName], [RecordId], [OldValue], [NewValue], [Description], [IPAddress])
         VALUES
             (@UserId, @Action, @TableName, @RecordId, @OldValue, @NewValue, @Description, @IPAddress);
-    END
 END
 GO
 
 -- Procedure: Get audit logs for user
-IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[sp_GetAuditLogsByUser]') AND type in (N'P'))
-BEGIN
-    CREATE PROCEDURE [dbo].[sp_GetAuditLogsByUser]
+CREATE OR ALTER PROCEDURE [dbo].[sp_GetAuditLogsByUser]
         @UserId INT,
         @Days INT = 30
     AS
@@ -503,7 +450,6 @@ BEGIN
         WHERE [UserId] = @UserId 
           AND [Timestamp] >= DATEADD(DAY, -@Days, GETUTCDATE())
         ORDER BY [Timestamp] DESC;
-    END
 END
 GO
 
@@ -512,9 +458,7 @@ GO
 -- =====================================================
 
 -- Procedure: Get dashboard statistics
-IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[sp_GetDashboardStats]') AND type in (N'P'))
-BEGIN
-    CREATE PROCEDURE [dbo].[sp_GetDashboardStats]
+CREATE OR ALTER PROCEDURE [dbo].[sp_GetDashboardStats]
     AS
     BEGIN
         SELECT 
@@ -523,14 +467,11 @@ BEGIN
             (SELECT COUNT(*) FROM [dbo].[Users] WHERE [Role] = 'POIOwner') AS [POIOwnerCount],
             (SELECT COUNT(*) FROM [dbo].[POIApprovalRequests] WHERE [Status] = 'Pending') AS [PendingRequestsCount],
             (SELECT COUNT(DISTINCT [Category]) FROM [dbo].[PointsOfInterest]) AS [CategoriesCount];
-    END
 END
 GO
 
 -- Procedure: Get POI statistics
-IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[sp_GetPOIStatisticsByCategory]') AND type in (N'P'))
-BEGIN
-    CREATE PROCEDURE [dbo].[sp_GetPOIStatisticsByCategory]
+CREATE OR ALTER PROCEDURE [dbo].[sp_GetPOIStatisticsByCategory]
     AS
     BEGIN
         SELECT 
@@ -541,7 +482,6 @@ BEGIN
         FROM [dbo].[PointsOfInterest]
         GROUP BY [Category]
         ORDER BY [Count] DESC;
-    END
 END
 GO
 
