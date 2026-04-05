@@ -1,17 +1,16 @@
-﻿using Microsoft.Extensions.DependencyInjection;
-
-namespace Tourist
+﻿namespace Tourist
 {
     public partial class App : Application
     {
-        public App()
+        // IServiceProvider được MAUI inject tự động
+        public App(IServiceProvider serviceProvider)
         {
             InitializeComponent();
-        }
 
-        protected override Window CreateWindow(IActivationState? activationState)
-        {
-            return new Window(new AppShell());
+            // Lấy MainPage từ DI container
+            // DI sẽ tự động inject IPoiService, ITranslationService,
+            // ITtsService, ILocationService vào constructor của MainPage
+            MainPage = serviceProvider.GetRequiredService<MainPage>();
         }
     }
 }

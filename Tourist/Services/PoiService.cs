@@ -15,20 +15,33 @@ namespace Tourist.Services
             _context = context;
         }
 
-        public async Task<List<PointOfInterest>> GetNearbyPOIsAsync(decimal latitude, decimal longitude, float radiusKm)
+        /// <summary>
+        /// Trả về các POI mà tourist đang đứng BÊN TRONG vùng phủ sóng của POI đó.
+        /// Logic: distance(tourist, POI) <= POI.Radius (km)
+        /// </summary>
+        public async Task<List<PointOfInterest>> GetNearbyPOIsAsync(decimal latitude, decimal longitude)
         {
             try
             {
-                // Haversine formula to calculate distance
-                // Using SQL Server FORMULA: Distance in km = ACOS(SIN(lat1)*SIN(lat2) + COS(lat1)*COS(lat2)*COS(lon2-lon1)) * 6371
-
-                var pois = await _context.PointsOfInterest
+                // Bước 1: Lấy toàn bộ POI đã được duyệt từ DB
+                var allPois = await _context.PointsOfInterest
                     .Where(p => p.IsApproved && p.Status == "Active")
-                    .AsAsyncEnumerable()
-                    .Where(p => CalculateDistance((double)latitude, (double)longitude, (double)p.Latitude, (double)p.Longitude) <= radiusKm)
                     .ToListAsync();
 
-                return pois.OrderBy(p => CalculateDistance((double)latitude, (double)longitude, (double)p.Latitude, (double)p.Longitude)).ToList();
+                // Bước 2: Lọc trong C# — chỉ giữ POI mà tourist đang đứng trong vùng phủ sóng
+                // Điều kiện: khoảng cách từ tourist đến POI <= Radius của POI đó
+                var nearbyPois = allPois
+                    .Where(p => CalculateDistanceKm(
+                        (double)latitude, (double)longitude,
+                        (double)p.Latitude, (double)p.Longitude
+                    ) <= (double)p.Radius)
+                    .OrderBy(p => CalculateDistanceKm(
+                        (double)latitude, (double)longitude,
+                        (double)p.Latitude, (double)p.Longitude
+                    ))
+                    .ToList();
+
+                return nearbyPois;
             }
             catch (Exception ex)
             {
@@ -83,9 +96,12 @@ namespace Tourist.Services
             }
         }
 
-        private double CalculateDistance(double lat1, double lon1, double lat2, double lon2)
+        /// <summary>
+        /// Công thức Haversine — tính khoảng cách (km) giữa 2 tọa độ trên mặt cầu.
+        /// </summary>
+        private double CalculateDistanceKm(double lat1, double lon1, double lat2, double lon2)
         {
-            const double R = 6371; // Earth's radius in km
+            const double R = 6371; // Bán kính Trái Đất (km)
             var dLat = ToRad(lat2 - lat1);
             var dLon = ToRad(lon2 - lon1);
             var a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2) +

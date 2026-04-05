@@ -4,7 +4,12 @@ namespace Tourist.Services
 {
     public interface IPoiService
     {
-        Task<List<PointOfInterest>> GetNearbyPOIsAsync(decimal latitude, decimal longitude, float radiusKm);
+        /// <summary>
+        /// Trả về các POI mà tourist đang đứng trong vùng phủ sóng (distance <= POI.Radius).
+        /// Không cần truyền radius — mỗi POI tự có Radius riêng.
+        /// </summary>
+        Task<List<PointOfInterest>> GetNearbyPOIsAsync(decimal latitude, decimal longitude);
+
         Task<List<PointOfInterest>> GetAllApprovedPOIsAsync();
         Task<PointOfInterest> GetPOIDetailsAsync(int poiId);
         Task<POITranslation> GetPOITranslationAsync(int poiId, string languageCode);

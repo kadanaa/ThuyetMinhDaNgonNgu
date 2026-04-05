@@ -3,80 +3,248 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:maps="clr-namespace:Microsoft.Maui.Controls.Maps;assembly=Microsoft.Maui.Controls.Maps"
              x:Class="Tourist.MainPage"
-             Title="Du Lịch - Tìm Địa Điểm">
+             Title="Du Lịch"
+             Shell.NavBarIsVisible="False">
 
     <Grid>
 
-        <!-- MAP FULL SCREEN -->
+        <!-- BAN DO FULL SCREEN -->
         <maps:Map x:Name="touristMap"
                   IsShowingUser="True"
-                  HorizontalOptions="FillAndExpand"
-                  VerticalOptions="FillAndExpand" />
+                  HorizontalOptions="Fill"
+                  VerticalOptions="Fill" />
 
         <!-- BOTTOM SHEET -->
         <Frame x:Name="BottomSheet"
                BackgroundColor="White"
                CornerRadius="20"
-               Padding="10"
+               Padding="0"
                HasShadow="True"
                VerticalOptions="End"
-               HeightRequest="300"
-               TranslationY="200">
+               HeightRequest="370"
+               TranslationY="180">
+
             <Frame.GestureRecognizers>
                 <PanGestureRecognizer PanUpdated="OnPanUpdated"/>
             </Frame.GestureRecognizers>
 
-            <Grid RowDefinitions="Auto,*,Auto">
+            <Grid RowDefinitions="Auto,Auto,*,Auto">
 
-                <!-- Thanh kéo nhỏ -->
-                <BoxView HeightRequest="5"
-                         WidthRequest="50"
-                         BackgroundColor="Gray"
+                <!-- Thanh keo -->
+                <BoxView Grid.Row="0"
+                         HeightRequest="4"
+                         WidthRequest="40"
+                         BackgroundColor="#DDDDDD"
                          HorizontalOptions="Center"
-                         CornerRadius="3"
-                         Margin="0,0,0,10"/>
+                         CornerRadius="2"
+                         Margin="0,10,0,8"/>
 
-                <!-- CollectionView hiển thị POI -->
-                <CollectionView Grid.Row="1"
+                <!-- PICKER vi tri va ngon ngu -->
+                <Grid Grid.Row="1"
+                      ColumnDefinitions="*,*"
+                      Margin="12,0,12,8"
+                      ColumnSpacing="8">
+
+                    <Frame Grid.Column="0"
+                           BackgroundColor="#F5F5F5"
+                           BorderColor="#E8E8E8"
+                           CornerRadius="10"
+                           Padding="8,4">
+                        <StackLayout Spacing="1">
+                            <Label Text="Vi tri dung"
+                                   FontSize="9"
+                                   TextColor="#999999"/>
+                            <Picker x:Name="LocationPicker"
+                                    FontSize="11"
+                                    TextColor="#222222"
+                                    TitleColor="#AAAAAA"
+                                    Title="Chon vi tri"
+                                    SelectedIndexChanged="OnLocationChanged"
+                                    Margin="-8,0"/>
+                        </StackLayout>
+                    </Frame>
+
+                    <Frame Grid.Column="1"
+                           BackgroundColor="#F5F5F5"
+                           BorderColor="#E8E8E8"
+                           CornerRadius="10"
+                           Padding="8,4">
+                        <StackLayout Spacing="1">
+                            <Label Text="Ngon ngu"
+                                   FontSize="9"
+                                   TextColor="#999999"/>
+                            <Picker x:Name="LanguagePicker"
+                                    FontSize="11"
+                                    TextColor="#222222"
+                                    TitleColor="#AAAAAA"
+                                    Title="Chon ngon ngu"
+                                    SelectedIndexChanged="OnLanguageChanged"
+                                    Margin="-8,0"/>
+                        </StackLayout>
+                    </Frame>
+
+                </Grid>
+
+                <!-- DANH SACH POI -->
+                <CollectionView Grid.Row="2"
                                 x:Name="PoiCollectionView"
-                                SelectionMode="Single">
+                                SelectionMode="Single"
+                                SelectionChanged="OnPoiSelectionChanged"
+                                Margin="12,0">
+
+                    <CollectionView.EmptyView>
+                        <StackLayout VerticalOptions="Center"
+                                     HorizontalOptions="Center"
+                                     Padding="20">
+                            <Label Text="&#128507;"
+                                   FontSize="32"
+                                   HorizontalOptions="Center"
+                                   Margin="0,0,0,8"/>
+                            <Label Text="Khong co dia diem nao trong vung cua ban"
+                                   FontSize="13"
+                                   TextColor="#AAAAAA"
+                                   HorizontalOptions="Center"
+                                   HorizontalTextAlignment="Center"/>
+                            <Label Text="Thu bam Tim hoac doi vi tri"
+                                   FontSize="11"
+                                   TextColor="#CCCCCC"
+                                   HorizontalOptions="Center"
+                                   HorizontalTextAlignment="Center"
+                                   Margin="0,4,0,0"/>
+                        </StackLayout>
+                    </CollectionView.EmptyView>
+
                     <CollectionView.ItemsLayout>
-                        <LinearItemsLayout Orientation="Horizontal" ItemSpacing="5" />
+                        <LinearItemsLayout Orientation="Vertical" ItemSpacing="5"/>
                     </CollectionView.ItemsLayout>
+
                     <CollectionView.ItemTemplate>
                         <DataTemplate>
-                            <Frame BorderColor="#DDD" CornerRadius="8" Padding="10" Margin="5,5,2,5" MinimumWidthRequest="140" BackgroundColor="White">
-                                <StackLayout Spacing="2">
-                                    <Label Text="{Binding POIName, StringFormat='📍 {0}'}" FontSize="11" FontAttributes="Bold" LineBreakMode="TailTruncation" />
-                                    <Label Text="{Binding Category, StringFormat='🏷️ {0}'}" FontSize="9" TextColor="#666" LineBreakMode="TailTruncation" />
-                                    <Label Text="{Binding Address}" FontSize="8" TextColor="#999" LineBreakMode="TailTruncation" />
-                                </StackLayout>
-                            </Frame>
+                            <Grid Padding="0,2">
+                                <Frame BorderColor="#EBEBEB"
+                                       BackgroundColor="White"
+                                       CornerRadius="10"
+                                       Padding="10,8"
+                                       HasShadow="False">
+
+                                    <Grid ColumnDefinitions="36,*,Auto"
+                                          ColumnSpacing="10">
+
+                                        <Frame Grid.Column="0"
+                                               BackgroundColor="#F0F7FF"
+                                               BorderColor="Transparent"
+                                               CornerRadius="8"
+                                               Padding="0"
+                                               WidthRequest="36"
+                                               HeightRequest="36"
+                                               VerticalOptions="Center">
+                                            <Label Text="&#128205;"
+                                                   FontSize="16"
+                                                   HorizontalOptions="Center"
+                                                   VerticalOptions="Center"/>
+                                        </Frame>
+
+                                        <StackLayout Grid.Column="1"
+                                                     Spacing="2"
+                                                     VerticalOptions="Center">
+                                            <Label Text="{Binding POIName}"
+                                                   FontSize="12"
+                                                   FontAttributes="Bold"
+                                                   TextColor="#222222"
+                                                   LineBreakMode="TailTruncation"/>
+                                            <Label Text="{Binding Category}"
+                                                   FontSize="10"
+                                                   TextColor="#888888"
+                                                   LineBreakMode="TailTruncation"/>
+                                            <Label Text="{Binding Address}"
+                                                   FontSize="9"
+                                                   TextColor="#BBBBBB"
+                                                   LineBreakMode="TailTruncation"/>
+                                        </StackLayout>
+
+                                        <Frame Grid.Column="2"
+                                               BackgroundColor="#E8F4FD"
+                                               BorderColor="Transparent"
+                                               CornerRadius="6"
+                                               Padding="6,3"
+                                               VerticalOptions="Center">
+                                            <Label Text="{Binding Radius, StringFormat='r={0:F1}km'}"
+                                                   FontSize="9"
+                                                   FontAttributes="Bold"
+                                                   TextColor="#1565C0"/>
+                                        </Frame>
+
+                                    </Grid>
+                                </Frame>
+                            </Grid>
                         </DataTemplate>
                     </CollectionView.ItemTemplate>
+
                 </CollectionView>
 
-                <!-- Controls -->
-                <StackLayout Grid.Row="2" Spacing="8">
+                <!-- BUTTONS -->
+                <Grid Grid.Row="3"
+                      ColumnDefinitions="*,*,*"
+                      Margin="12,8,12,16"
+                      ColumnSpacing="8">
 
-                    <!-- Picker và Entry -->
-                    <StackLayout Orientation="Horizontal" Spacing="5">
-                        <Picker x:Name="LocationPicker" Title="📍 Vị trí" SelectedIndexChanged="OnLocationChanged" HorizontalOptions="FillAndExpand" />
-                        <Picker x:Name="LanguagePicker" Title="🌐 Ngôn ngữ" SelectedIndexChanged="OnLanguageChanged" HorizontalOptions="FillAndExpand" />
-                        <Entry x:Name="RadiusEntry" Placeholder="km" Keyboard="Numeric" Text="2" WidthRequest="50" />
-                    </StackLayout>
+                    <Button Grid.Column="0"
+                            x:Name="SearchButton"
+                            Text="Tim"
+                            Clicked="OnSearchClicked"
+                            BackgroundColor="#1A73E8"
+                            TextColor="White"
+                            CornerRadius="10"
+                            FontSize="12"
+                            FontAttributes="Bold"
+                            HeightRequest="42"/>
 
-                    <!-- Buttons -->
-                    <StackLayout Orientation="Horizontal" Spacing="5">
-                        <Button x:Name="SearchButton" Text="🔍 Tìm" Clicked="OnSearchClicked" BackgroundColor="#2196F3" TextColor="White" HorizontalOptions="FillAndExpand" />
-                        <Button x:Name="DetailButton" Text="📋 Chi Tiết" Clicked="OnShowDetails" BackgroundColor="#4CAF50" TextColor="White" HorizontalOptions="FillAndExpand" />
-                        <Button x:Name="SpeakButton" Text="🔊 Nghe" Clicked="OnSpeak" BackgroundColor="#FF9800" TextColor="White" HorizontalOptions="FillAndExpand" />
-                        <Button x:Name="RefreshButton" Text="🔄 Làm Mới" Clicked="OnRefresh" BackgroundColor="#9C27B0" TextColor="White" HorizontalOptions="FillAndExpand" />
-                    </StackLayout>
+                    <Button Grid.Column="1"
+                            x:Name="SpeakButton"
+                            Text="Thuyet Minh"
+                            Clicked="OnSpeak"
+                            BackgroundColor="#FF9800"
+                            TextColor="White"
+                            CornerRadius="10"
+                            FontSize="11"
+                            FontAttributes="Bold"
+                            HeightRequest="42"/>
 
-                </StackLayout>
+                    <Button Grid.Column="2"
+                            x:Name="RefreshButton"
+                            Text="Lam Moi"
+                            Clicked="OnRefresh"
+                            BackgroundColor="#9C27B0"
+                            TextColor="White"
+                            CornerRadius="10"
+                            FontSize="12"
+                            FontAttributes="Bold"
+                            HeightRequest="42"/>
+
+                </Grid>
 
             </Grid>
+        </Frame>
+
+        <!-- LOADING OVERLAY -->
+        <Frame x:Name="LoadingOverlay"
+               IsVisible="False"
+               BackgroundColor="#CC000000"
+               CornerRadius="14"
+               Padding="24,16"
+               HorizontalOptions="Center"
+               VerticalOptions="Center"
+               HasShadow="False">
+            <StackLayout Orientation="Horizontal" Spacing="12">
+                <ActivityIndicator IsRunning="True"
+                                   Color="White"
+                                   WidthRequest="20"
+                                   HeightRequest="20"/>
+                <Label Text="Dang tim dia diem..."
+                       TextColor="White"
+                       FontSize="13"
+                       VerticalOptions="Center"/>
+            </StackLayout>
         </Frame>
 
     </Grid>
