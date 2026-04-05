@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:maps="clr-namespace:Microsoft.Maui.Controls.Maps;assembly=Microsoft.Maui.Controls.Maps"
              x:Class="Tourist.MainPage"
-             Title="Du Lịch"
+             Title="Du Lich"
              Shell.NavBarIsVisible="False">
 
     <Grid>
@@ -13,6 +13,30 @@
                   IsShowingUser="True"
                   HorizontalOptions="Fill"
                   VerticalOptions="Fill" />
+
+        <!-- DB STATUS BADGE -->
+        <Frame x:Name="DbStatusBadge"
+               CornerRadius="10"
+               Padding="8,5"
+               HasShadow="False"
+               HorizontalOptions="Start"
+               VerticalOptions="Start"
+               Margin="12,48,0,0"
+               BackgroundColor="#DDFFFFFF">
+            <StackLayout Orientation="Horizontal" Spacing="5">
+                <BoxView x:Name="DbStatusDot"
+                         WidthRequest="8"
+                         HeightRequest="8"
+                         CornerRadius="4"
+                         Color="#AAAAAA"
+                         VerticalOptions="Center"/>
+                <Label x:Name="DbStatusLabel"
+                       Text="Dang ket noi..."
+                       FontSize="10"
+                       TextColor="#555555"
+                       VerticalOptions="Center"/>
+            </StackLayout>
+        </Frame>
 
         <!-- BOTTOM SHEET -->
         <Frame x:Name="BottomSheet"

@@ -1,6 +1,8 @@
 ﻿using System.Diagnostics;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Maui.Controls.Maps;
 using Microsoft.Maui.Maps;
+using Tourist.Data;
 using Tourist.Models;
 using Tourist.Services;
 
@@ -12,41 +14,38 @@ public partial class MainPage : ContentPage
     private readonly ITranslationService _translationService;
     private readonly ITtsService _ttsService;
     private readonly ILocationService _locationService;
+    private readonly ThuyetMinhDbContext _context;
 
     private List<PointOfInterest> _currentPois = new();
     private List<Language> _availableLanguages = new();
     private Language _selectedLanguage;
     private PointOfInterest _selectedPoi;
-
-    // Giữ tọa độ hiện tại để dùng lại khi cần
     private decimal _currentLat;
     private decimal _currentLon;
-
     private double _startY;
 
-    // ----------------------------------------------------------------
-    // Constructor nhận service qua DI
-    // ----------------------------------------------------------------
     public MainPage(
         IPoiService poiService,
         ITranslationService translationService,
         ITtsService ttsService,
-        ILocationService locationService)
+        ILocationService locationService,
+        ThuyetMinhDbContext context)
     {
         InitializeComponent();
         _poiService = poiService;
         _translationService = translationService;
         _ttsService = ttsService;
         _locationService = locationService;
+        _context = context;
 
         _ = InitializeAsync();
     }
 
-    // ----------------------------------------------------------------
-    // Khởi tạo ban đầu
-    // ----------------------------------------------------------------
     private async Task InitializeAsync()
     {
+        // Kiem tra ket noi DB truoc tien
+        await CheckDbConnectionAsync();
+
         try
         {
             var locations = await _locationService.GetPredefinedLocationsAsync();
@@ -65,7 +64,6 @@ public partial class MainPage : ContentPage
                 .Select(l => $"{l.LanguageName} ({l.LanguageCode})")
                 .ToList();
 
-            // Mặc định chọn tiếng Anh
             var defaultIndex = _availableLanguages.FindIndex(l => l.LanguageCode == "en");
             LanguagePicker.SelectedIndex = defaultIndex >= 0 ? defaultIndex : 0;
             _selectedLanguage = _availableLanguages[LanguagePicker.SelectedIndex];
@@ -75,12 +73,110 @@ public partial class MainPage : ContentPage
         catch (Exception ex)
         {
             Debug.WriteLine($"[Init] Error: {ex.Message}");
-            await DisplayAlert("Lỗi", $"Không thể khởi tạo ứng dụng: {ex.Message}", "OK");
+            await DisplayAlert("Loi", $"Khong the khoi tao ung dung: {ex.Message}", "OK");
         }
     }
 
     // ----------------------------------------------------------------
-    // Đổi vị trí giả lập → tìm lại POI
+    // KIEM TRA KET NOI DATABASE
+    // Hien badge xanh/do goc tren man hinh
+    // ----------------------------------------------------------------
+    //private async Task CheckDbConnectionAsync()
+    //{
+    //    try
+    //    {
+    //        // SetStatus: dang kiem tra
+    //        SetDbStatus(status: "checking");
+
+    //        // Lenh don gian nhat de test connection: dem so ban ghi
+    //        var count = await _context.Database.ExecuteSqlRawAsync("SELECT 1");
+
+    //        // Neu khong throw exception = ket noi thanh cong
+    //        // Lay them thong tin so luong POI de hien thi
+    //        var poiCount = await _context.PointsOfInterest.CountAsync();
+    //        var langCount = await _context.Languages.CountAsync();
+
+    //        SetDbStatus("ok", $"DB OK  {poiCount} POI  {langCount} ngon ngu");
+    //    }
+    //    catch (Exception ex)
+    //    {
+    //        Debug.WriteLine($"[DB Check] Failed: {ex.Message}");
+
+    //        // Lay thong bao loi ngan gon de hien len badge
+    //        var shortMsg = ex.Message.Length > 40
+    //            ? ex.Message[..40] + "..."
+    //            : ex.Message;
+
+    //        SetDbStatus("error", $"Loi DB: {shortMsg}");
+    //    }
+    //}
+
+    private async Task CheckDbConnectionAsync()
+    {
+        try
+        {
+            SetDbStatus(status: "checking");
+
+            // ✅ SỬA Ở ĐÂY
+            var canConnect = await _context.Database.CanConnectAsync();
+
+            if (!canConnect)
+                throw new Exception("Khong the ket noi database");
+
+            var poiCount = await _context.PointsOfInterest.CountAsync();
+            var langCount = await _context.Languages.CountAsync();
+
+            SetDbStatus("ok", $"DB OK  {poiCount} POI  {langCount} ngon ngu");
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[DB Check] Failed: {ex.Message}");
+
+            var shortMsg = ex.Message.Length > 40
+                ? ex.Message[..40] + "..."
+                : ex.Message;
+
+            SetDbStatus("error", $"Loi DB: {shortMsg}");
+        }
+    }
+
+    // ----------------------------------------------------------------
+    // Cap nhat mau dot va text cua badge
+    // status: "checking" | "ok" | "error"
+    // ----------------------------------------------------------------
+    private void SetDbStatus(string status, string message = null)
+    {
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            switch (status)
+            {
+                case "checking":
+                    DbStatusDot.Color = Color.FromArgb("#AAAAAA");
+                    DbStatusLabel.Text = "Dang ket noi...";
+                    DbStatusLabel.TextColor = Color.FromArgb("#555555");
+                    break;
+
+                case "ok":
+                    DbStatusDot.Color = Color.FromArgb("#43A047");   // xanh la
+                    DbStatusLabel.Text = message ?? "Ket noi thanh cong";
+                    DbStatusLabel.TextColor = Color.FromArgb("#2E7D32");
+                    // Tu dong an badge sau 5 giay
+                    Task.Delay(5000).ContinueWith(_ =>
+                        MainThread.BeginInvokeOnMainThread(() =>
+                            DbStatusBadge.IsVisible = false));
+                    break;
+
+                case "error":
+                    DbStatusDot.Color = Color.FromArgb("#E53935");   // do
+                    DbStatusLabel.Text = message ?? "Loi ket noi DB";
+                    DbStatusLabel.TextColor = Color.FromArgb("#C62828");
+                    break;
+            }
+        });
+    }
+
+    // ----------------------------------------------------------------
+    // Doi vi tri gia lap
     // ----------------------------------------------------------------
     private async void OnLocationChanged(object sender, EventArgs e)
     {
@@ -97,7 +193,7 @@ public partial class MainPage : ContentPage
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[LocationChanged] Error: {ex.Message}");
+            Debug.WriteLine($"[LocationChanged] {ex.Message}");
         }
     }
 
@@ -109,20 +205,18 @@ public partial class MainPage : ContentPage
     }
 
     // ----------------------------------------------------------------
-    // Tìm POI theo logic: distance(tourist, POI) <= POI.Radius
+    // Tim POI: distance(tourist, POI) <= POI.Radius
     // ----------------------------------------------------------------
     private async Task SearchPoisAsync()
     {
         try
         {
-            // Hiện loading overlay
             LoadingOverlay.IsVisible = true;
             SearchButton.IsEnabled = false;
             PoiCollectionView.ItemsSource = null;
 
             (_currentLat, _currentLon) = await _locationService.GetCurrentLocationAsync();
 
-            // Di chuyển map đến vị trí tourist
             touristMap.MoveToRegion(
                 MapSpan.FromCenterAndRadius(
                     new Location((double)_currentLat, (double)_currentLon),
@@ -147,14 +241,13 @@ public partial class MainPage : ContentPage
 
             PoiCollectionView.ItemsSource = _currentPois;
 
-            // Kéo bottom sheet lên để thấy danh sách nếu có POI
             if (_currentPois.Count > 0)
                 await BottomSheet.TranslateTo(0, 0, 300, Easing.CubicOut);
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[Search] Error: {ex.Message}");
-            await DisplayAlert("Lỗi", $"Lỗi tìm kiếm: {ex.Message}", "OK");
+            Debug.WriteLine($"[Search] {ex.Message}");
+            await DisplayAlert("Loi", $"Loi tim kiem: {ex.Message}", "OK");
         }
         finally
         {
@@ -167,17 +260,13 @@ public partial class MainPage : ContentPage
     private async void OnRefresh(object sender, EventArgs e) => await SearchPoisAsync();
 
     // ----------------------------------------------------------------
-    // Click vào POI trong sidebar:
-    //   1. Map di chuyển đến POI
-    //   2. Bottom sheet thu lại một nửa để thấy map
-    //   3. Hiện bảng thông tin chi tiết
+    // Click POI trong sidebar
     // ----------------------------------------------------------------
     private async void OnPoiSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (e.CurrentSelection.FirstOrDefault() is not PointOfInterest poi) return;
         _selectedPoi = poi;
 
-        // Map di chuyển đến POI (zoom gần hơn)
         touristMap.MoveToRegion(
             MapSpan.FromCenterAndRadius(
                 new Location((double)poi.Latitude, (double)poi.Longitude),
@@ -185,63 +274,52 @@ public partial class MainPage : ContentPage
             )
         );
 
-        // Thu bottom sheet lại một nửa để thấy bản đồ
         await BottomSheet.TranslateTo(0, 180, 250, Easing.CubicOut);
-
-        // Hiện thông tin POI dạng popup
         await ShowPoiInfoSheetAsync(poi);
     }
 
-    // ----------------------------------------------------------------
-    // Hiện bảng thông tin POI — dùng ActionSheet thay DisplayAlert
-    // để có nút "Thuyết Minh" ngay bên trong
-    // ----------------------------------------------------------------
     private async Task ShowPoiInfoSheetAsync(PointOfInterest poi)
     {
         try
         {
             var langCode = _selectedLanguage?.LanguageCode ?? "en";
             var translation = await _poiService.GetPOITranslationAsync(poi.POIId, langCode);
-
             var name = translation?.TranslatedName ?? poi.POIName;
-            var description = translation?.TranslatedDescription ?? poi.Description
-                              ?? "Chưa có mô tả.";
-
+            var description = translation?.TranslatedDescription ?? poi.Description ?? "Chua co mo ta.";
             var langName = _selectedLanguage?.LanguageName ?? "English";
 
-            var message = $"🏷️ {poi.Category}  |  📍 r = {poi.Radius:F1} km\n" +
-                          $"🏠 {poi.Address}\n" +
-                          (string.IsNullOrEmpty(poi.PhoneNumber) ? "" : $"📞 {poi.PhoneNumber}\n") +
-                          $"\n── Mô tả ({langName}) ──\n{description}";
+            var message = $"Danh muc: {poi.Category}\n" +
+                          $"Dia chi: {poi.Address}\n" +
+                          (string.IsNullOrEmpty(poi.PhoneNumber) ? "" : $"Dien thoai: {poi.PhoneNumber}\n") +
+                          $"\nMo ta ({langName}):\n{description}";
 
-            // ActionSheet cho phép chọn "Thuyết Minh" hoặc "Đóng"
             var action = await DisplayActionSheet(
-                title: $"📍 {name}",
-                cancel: "Đóng",
+                title: $"[POI] {name}",
+                cancel: "Dong",
                 destruction: null,
-                "🔊 Thuyết Minh ngay",
-                "📋 Xem thêm thông tin"
+                "Thuyet Minh ngay",
+                "Xem them thong tin"
             );
 
-            if (action == "🔊 Thuyết Minh ngay")
+            if (action == "Thuyet Minh ngay")
                 await SpeakPoiAsync(poi);
-            else if (action == "📋 Xem thêm thông tin")
-                await DisplayAlert($"📍 {name}", message, "Đóng");
+            else if (action == "Xem them thong tin")
+                await DisplayAlert($"[POI] {name}", message, "Dong");
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[ShowInfo] Error: {ex.Message}");
+            Debug.WriteLine($"[ShowInfo] {ex.Message}");
         }
     }
 
     // ----------------------------------------------------------------
-    // Thuyết minh: dịch → đọc TTS
+    // Thuyet minh TTS
     // ----------------------------------------------------------------
     private async void OnSpeak(object sender, EventArgs e)
     {
         if (_selectedPoi == null)
         {
-            await DisplayAlert("Thông báo", "Vui lòng chọn một địa điểm từ danh sách trước.", "OK");
+            await DisplayAlert("Thong bao", "Vui long chon mot dia diem truoc.", "OK");
             return;
         }
         await SpeakPoiAsync(_selectedPoi);
@@ -252,31 +330,28 @@ public partial class MainPage : ContentPage
         try
         {
             SpeakButton.IsEnabled = false;
-            SpeakButton.Text = "🔊 Đang phát...";
+            SpeakButton.Text = "Dang phat...";
 
             var langCode = _selectedLanguage?.LanguageCode ?? "en";
-            var rawDescription = poi.Description ?? string.Empty;
-
-            // Ưu tiên bản dịch sẵn trong DB
             var existing = await _poiService.GetPOITranslationAsync(poi.POIId, langCode);
-            string textToSpeak;
 
+            string textToSpeak;
             if (existing != null && !string.IsNullOrEmpty(existing.TranslatedDescription))
                 textToSpeak = existing.TranslatedDescription;
             else
-                textToSpeak = await _translationService.TranslateTextAsync(rawDescription, langCode);
+                textToSpeak = await _translationService.TranslateTextAsync(poi.Description ?? "", langCode);
 
             await _ttsService.SpeakAsync(textToSpeak, langCode);
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[Speak] Error: {ex.Message}");
-            await DisplayAlert("Lỗi", $"Không thể phát âm thanh: {ex.Message}", "OK");
+            Debug.WriteLine($"[Speak] {ex.Message}");
+            await DisplayAlert("Loi", $"Khong the phat am thanh: {ex.Message}", "OK");
         }
         finally
         {
             SpeakButton.IsEnabled = true;
-            SpeakButton.Text = "🔊 Thuyết Minh";
+            SpeakButton.Text = "Thuyet Minh";
         }
     }
 
@@ -285,20 +360,20 @@ public partial class MainPage : ContentPage
     // ----------------------------------------------------------------
     private List<Language> GetDefaultLanguages() => new()
     {
-        new() { LanguageId = 1,  LanguageCode = "vi", LanguageName = "Tiếng Việt",      NativeName = "Việt Nam",    IsActive = true },
-        new() { LanguageId = 2,  LanguageCode = "en", LanguageName = "English",          NativeName = "English",     IsActive = true },
-        new() { LanguageId = 3,  LanguageCode = "es", LanguageName = "Español",          NativeName = "España",      IsActive = true },
-        new() { LanguageId = 4,  LanguageCode = "fr", LanguageName = "Français",         NativeName = "France",      IsActive = true },
-        new() { LanguageId = 5,  LanguageCode = "de", LanguageName = "Deutsch",          NativeName = "Deutschland", IsActive = true },
-        new() { LanguageId = 6,  LanguageCode = "ja", LanguageName = "日本語",            NativeName = "日本",        IsActive = true },
-        new() { LanguageId = 7,  LanguageCode = "zh", LanguageName = "中文",              NativeName = "中国",        IsActive = true },
-        new() { LanguageId = 8,  LanguageCode = "ko", LanguageName = "한국어",            NativeName = "한국",        IsActive = true },
-        new() { LanguageId = 9,  LanguageCode = "th", LanguageName = "ไทย",              NativeName = "ไทย",         IsActive = true },
-        new() { LanguageId = 10, LanguageCode = "id", LanguageName = "Bahasa Indonesia", NativeName = "Indonesia",   IsActive = true },
+        new() { LanguageId = 1,  LanguageCode = "vi", LanguageName = "Tieng Viet",       IsActive = true },
+        new() { LanguageId = 2,  LanguageCode = "en", LanguageName = "English",           IsActive = true },
+        new() { LanguageId = 3,  LanguageCode = "es", LanguageName = "Espanol",           IsActive = true },
+        new() { LanguageId = 4,  LanguageCode = "fr", LanguageName = "Francais",          IsActive = true },
+        new() { LanguageId = 5,  LanguageCode = "de", LanguageName = "Deutsch",           IsActive = true },
+        new() { LanguageId = 6,  LanguageCode = "ja", LanguageName = "Nhat",              IsActive = true },
+        new() { LanguageId = 7,  LanguageCode = "zh", LanguageName = "Trung",             IsActive = true },
+        new() { LanguageId = 8,  LanguageCode = "ko", LanguageName = "Han Quoc",          IsActive = true },
+        new() { LanguageId = 9,  LanguageCode = "th", LanguageName = "Thai",              IsActive = true },
+        new() { LanguageId = 10, LanguageCode = "id", LanguageName = "Indonesia",         IsActive = true },
     };
 
     // ----------------------------------------------------------------
-    // Pan gesture cho Bottom Sheet
+    // Pan gesture Bottom Sheet
     // ----------------------------------------------------------------
     private void OnPanUpdated(object sender, PanUpdatedEventArgs e)
     {
@@ -307,14 +382,10 @@ public partial class MainPage : ContentPage
             case GestureStatus.Started:
                 _startY = BottomSheet.TranslationY;
                 break;
-
             case GestureStatus.Running:
-                var newY = Math.Clamp(_startY + e.TotalY, 0, 280);
-                BottomSheet.TranslationY = newY;
+                BottomSheet.TranslationY = Math.Clamp(_startY + e.TotalY, 0, 280);
                 break;
-
             case GestureStatus.Completed:
-                // Snap: nếu kéo quá nửa thì thu lại, không thì mở ra
                 _ = BottomSheet.TranslationY > 140
                     ? BottomSheet.TranslateTo(0, 280, 200, Easing.CubicOut)
                     : BottomSheet.TranslateTo(0, 0, 200, Easing.CubicOut);
