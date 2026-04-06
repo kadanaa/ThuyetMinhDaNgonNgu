@@ -1,6 +1,4 @@
-# 🌍 Thuyết Minh Dạo Ngôn Ngữ (Multilingual Tour Guide)
+# 🌍 Thuyết Minh Đa Ngôn Ngữ (Multilingual Tour Guide)
 
-**A comprehensive solution for tourist navigation and POI exploration with multilingual support and text-to-speech functionality.**
-
----
+**Phần mềm thuyết minh tự động theo ngôn ngữ tùy chọn dùng để phục vụ và nâng cao trải nghiệm của các nhà lữ hành.**
 
