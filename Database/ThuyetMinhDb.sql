@@ -260,16 +260,21 @@ END
 GO
 
 -- Insert Sample POI Data
-IF NOT EXISTS (SELECT * FROM [dbo].[PointsOfInterest] WHERE POIName = 'Phở Bắc Hà')
-BEGIN
-    INSERT INTO [dbo].[PointsOfInterest] 
-        ([POIName], [Description], [Latitude], [Longitude], [Radius], [Category], [Address], [PhoneNumber], [OwnerId], [IsApproved], [Status])
-    VALUES 
-        ('Phở Bắc Hà', 'Quán phở nổi tiếng với nước dùng được nấu trong 12 tiếng. Phục vụ phở bò ngon lành với giá hợp lý. Mở từ 5h sáng đến 11h đêm. Nước phở thơm ngon, thịt bò mềm, bánh phở chứng thực được chỉnh qua nước lạnh nhiều lần.', 21.028511, 105.854100, 0.5, 'Restaurant', '45 Hàng Manh, Hoàn Kiếm, Hà Nội', '024 3938 1485', 2, 1, 'Active'),
-        ('Cafe Trời Xanh', 'Cafe nhỏ xinh với không gian thoáng mát, thích hợp để học tập hoặc gặp gỡ bạn bè. Cà phê được rang tại chỗ hàng ngày. Phục vụ các loại đồ uống từ cà phê, trà, nước ép trái cây tươi. Có WiFi miễn phí và điều hòa.', 21.027500, 105.853800, 0.4, 'Cafe', '23 Cửa Bắc, Hoàn Kiếm, Hà Nội', '024 3935 9283', 2, 1, 'Active'),
-        ('Tạp Hóa Minh Phúc', 'Cửa hàng tạp hóa đầy đủ các mặt hàng ăn uống, mỹ phẩm, nước rửa tay, mặt nạ y tế, và các sản phẩm tiêu dùng hàng ngày khác. Mở từ 6h sáng đến 11h đêm hàng ngày.', 21.029000, 105.855200, 0.3, 'Shop', '67 Hàng Bông, Hoàn Kiếm, Hà Nội', '024 3936 2015', 2, 1, 'Active');
-END
-GO
+INSERT INTO [dbo].[PointsOfInterest] 
+    ([POIName], [Description], [Latitude], [Longitude], [Radius], 
+     [Category], [Address], [PhoneNumber], [OwnerId], [IsApproved], [Status])
+VALUES 
+    (N'Phở Bắc Hà', 
+     N'Quán phở nổi tiếng với nước dùng được nấu trong 12 tiếng. Phục vụ phở bò ngon lành với giá hợp lý. Mở từ 5h sáng đến 11h đêm.', 
+     21.028511, 105.854100, 0.5, N'Restaurant', N'45 Hàng Mành, Hoàn Kiếm, Hà Nội', N'024 3938 1485', 2, 1, N'Active'),
+
+    (N'Cafe Trời Xanh', 
+     N'Cafe nhỏ xinh với không gian thoáng mát, thích hợp để học tập hoặc gặp gỡ bạn bè. Cà phê được rang tại chỗ hàng ngày. Có WiFi miễn phí và điều hòa.', 
+     21.027500, 105.853800, 0.4, N'Cafe', N'23 Cửa Bắc, Hoàn Kiếm, Hà Nội', N'024 3935 9283', 2, 1, N'Active'),
+
+    (N'Tạp Hóa Minh Phúc', 
+     N'Cửa hàng tạp hóa đầy đủ các mặt hàng ăn uống, mỹ phẩm, nước rửa tay, mặt nạ y tế, và các sản phẩm tiêu dùng hàng ngày khác. Mở từ 6h sáng đến 11h đêm hàng ngày.', 
+     21.029000, 105.855200, 0.3, N'Shop', N'67 Hàng Bông, Hoàn Kiếm, Hà Nội', N'024 3936 2015', 2, 1, N'Active');
 
 -- Create View for POI with Owner Information
 CREATE OR ALTER VIEW [dbo].[vw_POIWithOwner] AS
