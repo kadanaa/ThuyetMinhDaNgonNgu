@@ -109,11 +109,11 @@ CREATE OR ALTER PROCEDURE [dbo].[sp_GetPOINearLocationAdvanced]
         FROM [dbo].[PointsOfInterest] p
         WHERE p.[IsApproved] = 1 
           AND p.[Status] = 'Active'
-          AND (6371 * ACOS(
-                COS(RADIANS(@Latitude)) * COS(RADIANS(p.[Latitude])) *
-                COS(RADIANS(p.[Longitude]) - RADIANS(@Longitude)) +
-                SIN(RADIANS(@Latitude)) * SIN(RADIANS(p.[Latitude]))
-              )) <= p.[Radius]
+        --   AND (6371 * ACOS(
+        --         COS(RADIANS(@Latitude)) * COS(RADIANS(p.[Latitude])) *
+        --         COS(RADIANS(p.[Longitude]) - RADIANS(@Longitude)) +
+        --         SIN(RADIANS(@Latitude)) * SIN(RADIANS(p.[Latitude]))
+        --       )) <= p.[Radius]
         ORDER BY [DistanceKm] ASC;
 END
 GO

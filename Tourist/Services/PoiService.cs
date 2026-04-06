@@ -19,17 +19,49 @@ namespace Tourist.Services
         /// Trả về các POI mà tourist đang đứng BÊN TRONG vùng phủ sóng của POI đó.
         /// Logic: distance(tourist, POI) <= POI.Radius (km)
         /// </summary>
+        //public async Task<List<PointOfInterest>> GetNearbyPOIsAsync(decimal latitude, decimal longitude)
+        //{
+        //    try
+        //    {
+        //        // Bước 1: Lấy toàn bộ POI đã được duyệt từ DB
+        //        var allPois = await _context.PointsOfInterest.AsNoTracking()
+        //            //.Where(p => p.IsApproved && p.Status == "Active")
+        //            .ToListAsync();
+
+        //        // Bước 2: Lọc trong C# — chỉ giữ POI mà tourist đang đứng trong vùng phủ sóng
+        //        // Điều kiện: khoảng cách từ tourist đến POI <= Radius của POI đó
+        //        var nearbyPois = allPois.ToList();
+        //            //.Where(p => CalculateDistanceKm(
+        //            //    (double)latitude, (double)longitude,
+        //            //    (double)p.Latitude, (double)p.Longitude
+        //            //) <= (double)p.Radius)
+        //            //.OrderBy(p => CalculateDistanceKm(
+        //            //    (double)latitude, (double)longitude,
+        //            //    (double)p.Latitude, (double)p.Longitude
+        //            //))
+        //            //.ToList();
+
+        //        return nearbyPois;
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        Debug.WriteLine($"[PoiService] CRITICAL ERROR in GetNearbyPOIsAsync: {ex}");
+        //        // Ghi toàn bộ stack trace thay vì chỉ Message
+        //        return new List<PointOfInterest>();
+        //    }
+        //}
+
         public async Task<List<PointOfInterest>> GetNearbyPOIsAsync(decimal latitude, decimal longitude)
         {
             try
             {
-                // Bước 1: Lấy toàn bộ POI đã được duyệt từ DB
                 var allPois = await _context.PointsOfInterest
                     .Where(p => p.IsApproved && p.Status == "Active")
                     .ToListAsync();
 
-                // Bước 2: Lọc trong C# — chỉ giữ POI mà tourist đang đứng trong vùng phủ sóng
-                // Điều kiện: khoảng cách từ tourist đến POI <= Radius của POI đó
+                // THÊM DÒNG NÀY:
+                System.Diagnostics.Debug.WriteLine($"[POI] allPois.Count = {allPois.Count}");
+
                 var nearbyPois = allPois
                     .Where(p => CalculateDistanceKm(
                         (double)latitude, (double)longitude,
@@ -45,9 +77,15 @@ namespace Tourist.Services
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Error in GetNearbyPOIsAsync: {ex.Message}");
+                // SỬA DÒNG NÀY — log toàn bộ ex thay vì chỉ ex.Message:
+                System.Diagnostics.Debug.WriteLine($"[POI] EXCEPTION:\n{ex}");
                 return new List<PointOfInterest>();
             }
+        }
+
+        public async Task<int> CountPOIsAsync()
+        {
+            return await _context.PointsOfInterest.CountAsync();
         }
 
         public async Task<List<PointOfInterest>> GetAllApprovedPOIsAsync()

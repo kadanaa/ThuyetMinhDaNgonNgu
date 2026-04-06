@@ -126,17 +126,26 @@ public partial class MainPage : ContentPage
             var poiCount = await _context.PointsOfInterest.CountAsync();
             var langCount = await _context.Languages.CountAsync();
 
-            SetDbStatus("ok", $"DB OK  {poiCount} POI  {langCount} ngon ngu");
+            //// THÊM: dùng raw SQL để lấy list
+            //var rawList = await _context.PointsOfInterest
+            //    .FromSqlRaw("SELECT * FROM PointsOfInterest")
+            //    .ToListAsync();
+
+            //// THÊM: dùng EF bình thường
+            //var efList = await _context.PointsOfInterest.ToListAsync();
+
+            //await MainThread.InvokeOnMainThreadAsync(() =>
+            //    DisplayAlert("Debug",
+            //        $"CountAsync = {poiCount}\n" +
+            //        $"FromSqlRaw count = {rawList.Count}\n" +
+            //        $"ToListAsync count = {efList.Count}", "OK"));
+
+            SetDbStatus("ok", $"ACTIVE");
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[DB Check] Failed: {ex.Message}");
-
-            var shortMsg = ex.Message.Length > 40
-                ? ex.Message[..40] + "..."
-                : ex.Message;
-
-            SetDbStatus("error", $"Loi DB: {shortMsg}");
+            System.Diagnostics.Debug.WriteLine($"[DB] EXCEPTION: {ex}");
+            SetDbStatus("error", ex.Message);
         }
     }
 
@@ -161,7 +170,7 @@ public partial class MainPage : ContentPage
                     DbStatusLabel.Text = message ?? "Ket noi thanh cong";
                     DbStatusLabel.TextColor = Color.FromArgb("#2E7D32");
                     // Tu dong an badge sau 5 giay
-                    Task.Delay(5000).ContinueWith(_ =>
+                    Task.Delay(10000).ContinueWith(_ =>
                         MainThread.BeginInvokeOnMainThread(() =>
                             DbStatusBadge.IsVisible = false));
                     break;
@@ -228,6 +237,23 @@ public partial class MainPage : ContentPage
 
             _currentPois = await _poiService.GetNearbyPOIsAsync(_currentLat, _currentLon);
 
+            int poicount = await _poiService.CountPOIsAsync();
+            //var count = await _context.PointsOfInterest.CountAsync();
+            //var list = await _context.PointsOfInterest.ToListAsync();
+
+            //// Thêm dòng này tạm thời để debug:
+            //System.Diagnostics.Debug.WriteLine(
+            //    $"[DEBUG] Tìm tại ({_currentLat:F6}, {_currentLon:F6}) → {_currentPois.Count} POI");
+            //if (_currentPois.Count == 0)
+            //    await DisplayAlert("Debug",
+            //        $"Query tại ({_currentLat:F6}, {_currentLon:F6})\nKết quả: 0 POI\nKiểm tra Output window", "OK");
+
+            //System.Diagnostics.Debug.WriteLine(
+            //    $"[DEBUG] Tìm tại ({_currentLat:F6}, {_currentLon:F6}) → {_currentPois.Count} POI");
+            //if (_currentPois.Count == 0)
+            //    await DisplayAlert("Debug",
+            //        $"CountAsync = {count}, List.Count = {list.Count}\nKết quả: 0 POI\nKiểm tra Output window", "OK");
+
             foreach (var poi in _currentPois)
             {
                 touristMap.Pins.Add(new Pin
@@ -246,8 +272,8 @@ public partial class MainPage : ContentPage
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[Search] {ex.Message}");
-            await DisplayAlert("Loi", $"Loi tim kiem: {ex.Message}", "OK");
+            Debug.WriteLine($"[Search] {ex}");
+            await DisplayAlert("Loi", $"Loi tim kiem: {ex}", "OK");
         }
         finally
         {

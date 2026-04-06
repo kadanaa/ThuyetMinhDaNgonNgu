@@ -126,7 +126,7 @@ public async Task<PointOfInterest> GetPOIDetailAsync(int poiId)
 EXEC sp_GetPOINearLocationAdvanced 
     @Latitude = 21.028511,
     @Longitude = 105.854100,
-    @DistanceMeters = 5000;
+    @DistanceMeters = 500000000;
 ```
 
 **Parameters:**
@@ -142,7 +142,41 @@ EXEC sp_GetPOINearLocationAdvanced
 
 **C# MAUI Example:**
 ```csharp
-public async Task<List<PointOfInterest>> GetNearbyPOIsAsync(decimal latitude, decimal longitude, float distance = 5000)
+// public async Task<List<PointOfInterest>> GetNearbyPOIsAsync(decimal latitude, decimal longitude, float distance = 50000000)
+// {
+//     var pois = new List<PointOfInterest>();
+
+//     using (var connection = new SqlConnection(_connectionString))
+//     {
+//         using (var command = new SqlCommand("sp_GetPOINearLocationAdvanced", connection))
+//         {
+//             command.CommandType = CommandType.StoredProcedure;
+//             command.Parameters.AddWithValue("@Latitude", latitude);
+//             command.Parameters.AddWithValue("@Longitude", longitude);
+//             command.Parameters.AddWithValue("@DistanceMeters", distance);
+
+//             connection.Open();
+//             var reader = await command.ExecuteReaderAsync();
+
+//             while (reader.Read())
+//             {
+//                 pois.Add(new PointOfInterest
+//                 {
+//                     POIId = (int)reader["POIId"],
+//                     POIName = reader["POIName"].ToString(),
+//                     Latitude = (decimal)reader["Latitude"],
+//                     Longitude = (decimal)reader["Longitude"],
+//                     Category = reader["Category"].ToString(),
+//                     Address = reader["Address"].ToString(),
+//                     // ... more properties
+//                 });
+//             }
+//         }
+//     }
+//     return pois;
+// }
+
+public async Task<List<PointOfInterest>> GetNearbyPOIsAsync(decimal latitude, decimal longitude, float? distance = null)
 {
     var pois = new List<PointOfInterest>();
 
@@ -153,23 +187,29 @@ public async Task<List<PointOfInterest>> GetNearbyPOIsAsync(decimal latitude, de
             command.CommandType = CommandType.StoredProcedure;
             command.Parameters.AddWithValue("@Latitude", latitude);
             command.Parameters.AddWithValue("@Longitude", longitude);
-            command.Parameters.AddWithValue("@DistanceMeters", distance);
+            
+            // Nếu dùng cách số lớn của bạn:
+            // command.Parameters.AddWithValue("@DistanceMeters", distance ?? 50000000);
+            
+            // Nếu dùng cách truyền NULL (khuyên dùng):
+            command.Parameters.AddWithValue("@DistanceMeters", (object)distance ?? DBNull.Value);
 
-            connection.Open();
-            var reader = await command.ExecuteReaderAsync();
+            await connection.OpenAsync(); // Dùng OpenAsync
 
-            while (reader.Read())
+            using (var reader = await command.ExecuteReaderAsync())
             {
-                pois.Add(new PointOfInterest
+                while (await reader.ReadAsync())
                 {
-                    POIId = (int)reader["POIId"],
-                    POIName = reader["POIName"].ToString(),
-                    Latitude = (decimal)reader["Latitude"],
-                    Longitude = (decimal)reader["Longitude"],
-                    Category = reader["Category"].ToString(),
-                    Address = reader["Address"].ToString(),
-                    // ... more properties
-                });
+                    pois.Add(new PointOfInterest
+                    {
+                        POIId = reader["POIId"] != DBNull.Value ? (int)reader["POIId"] : 0,
+                        POIName = reader["POIName"]?.ToString() ?? string.Empty,
+                        Latitude = reader["Latitude"] != DBNull.Value ? (decimal)reader["Latitude"] : 0m,
+                        Longitude = reader["Longitude"] != DBNull.Value ? (decimal)reader["Longitude"] : 0m,
+                        Category = reader["Category"]?.ToString() ?? "N/A",
+                        Address = reader["Address"]?.ToString() ?? string.Empty
+                    });
+                }
             }
         }
     }

@@ -13,6 +13,7 @@ namespace Tourist.Services
         Task<List<PointOfInterest>> GetAllApprovedPOIsAsync();
         Task<PointOfInterest> GetPOIDetailsAsync(int poiId);
         Task<POITranslation> GetPOITranslationAsync(int poiId, string languageCode);
+        Task<int> CountPOIsAsync();
     }
 
     public interface ITranslationService

@@ -183,7 +183,7 @@ using (var connection = new SqlConnection(connectionString))
         command.CommandType = CommandType.StoredProcedure;
         command.Parameters.AddWithValue("@Latitude", 21.0285);
         command.Parameters.AddWithValue("@Longitude", 105.8542);
-        command.Parameters.AddWithValue("@DistanceMeters", 5000);
+        command.Parameters.AddWithValue("@DistanceMeters", 50000000);
 
         connection.Open();
         var reader = command.ExecuteReader();
@@ -292,7 +292,7 @@ EXEC sp_GetAllApprovedPOIs;
 EXEC sp_GetPOINearLocationAdvanced 
     @Latitude = 21.028511,
     @Longitude = 105.854100,
-    @DistanceMeters = 2000;
+    @DistanceMeters = 50000000;
 ```
 
 ### 4. Xem thống kê dashboard:
