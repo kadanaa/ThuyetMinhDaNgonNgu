@@ -20,9 +20,14 @@ public partial class MainPage : ContentPage
     private List<Language> _availableLanguages = new();
     private Language _selectedLanguage;
     private PointOfInterest _selectedPoi;
+    private readonly Dictionary<Pin, PointOfInterest> _pinToPoiMap = new();
     private decimal _currentLat;
     private decimal _currentLon;
     private double _startY;
+    private Circle _selectedLocationCircle;
+    private const double BottomSheetExpandedY = 0;
+    private const double BottomSheetCollapsedY = 280;
+    private const double BottomSheetSnapThresholdY = 140;
 
     public MainPage(
         IPoiService poiService,
@@ -213,6 +218,44 @@ public partial class MainPage : ContentPage
             _selectedLanguage = _availableLanguages[LanguagePicker.SelectedIndex];
     }
 
+    private async void OnMapClicked(object sender, MapClickedEventArgs e)
+    {
+        try
+        {
+            var latitude = (decimal)e.Location.Latitude;
+            var longitude = (decimal)e.Location.Longitude;
+
+            _locationService.SetSimulatedLocation(latitude, longitude);
+            _currentLat = latitude;
+            _currentLon = longitude;
+
+            UpdateSelectedLocationDot(latitude, longitude);
+
+            await SearchPoisAsync();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[MapClicked] {ex.Message}");
+        }
+    }
+
+    private void UpdateSelectedLocationDot(decimal latitude, decimal longitude)
+    {
+        if (_selectedLocationCircle != null)
+            touristMap.MapElements.Remove(_selectedLocationCircle);
+
+        _selectedLocationCircle = new Circle
+        {
+            Center = new Location((double)latitude, (double)longitude),
+            Radius = new Distance(12),
+            StrokeColor = Color.FromArgb("#2962FF"),
+            StrokeWidth = 2,
+            FillColor = Color.FromArgb("#802962FF")
+        };
+
+        touristMap.MapElements.Add(_selectedLocationCircle);
+    }
+
     // ----------------------------------------------------------------
     // Tim POI: distance(tourist, POI) <= POI.Radius
     // ----------------------------------------------------------------
@@ -234,6 +277,7 @@ public partial class MainPage : ContentPage
             );
 
             touristMap.Pins.Clear();
+            _pinToPoiMap.Clear();
 
             _currentPois = await _poiService.GetNearbyPOIsAsync(_currentLat, _currentLon);
 
@@ -256,19 +300,23 @@ public partial class MainPage : ContentPage
 
             foreach (var poi in _currentPois)
             {
-                touristMap.Pins.Add(new Pin
+                var pin = new Pin
                 {
                     Label = poi.POIName,
                     Address = poi.Category ?? string.Empty,
                     Location = new Location((double)poi.Latitude, (double)poi.Longitude),
                     Type = PinType.Place
-                });
+                };
+
+                pin.MarkerClicked += OnMapPinClicked;
+                _pinToPoiMap[pin] = poi;
+                touristMap.Pins.Add(pin);
             }
 
             PoiCollectionView.ItemsSource = _currentPois;
 
             if (_currentPois.Count > 0)
-                await BottomSheet.TranslateTo(0, 0, 300, Easing.CubicOut);
+                await BottomSheet.TranslateTo(0, BottomSheetExpandedY, 220, Easing.CubicOut);
         }
         catch (Exception ex)
         {
@@ -291,6 +339,22 @@ public partial class MainPage : ContentPage
     private async void OnPoiSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (e.CurrentSelection.FirstOrDefault() is not PointOfInterest poi) return;
+        await FocusPoiAsync(poi);
+    }
+
+    private async void OnMapPinClicked(object sender, PinClickedEventArgs e)
+    {
+        if (sender is not Pin pin)
+            return;
+
+        if (_pinToPoiMap.TryGetValue(pin, out var poi))
+            await FocusPoiAsync(poi);
+
+        e.HideInfoWindow = true;
+    }
+
+    private async Task FocusPoiAsync(PointOfInterest poi)
+    {
         _selectedPoi = poi;
 
         touristMap.MoveToRegion(
@@ -300,8 +364,37 @@ public partial class MainPage : ContentPage
             )
         );
 
-        await BottomSheet.TranslateTo(0, 180, 250, Easing.CubicOut);
+        await BottomSheet.TranslateTo(0, BottomSheetCollapsedY, 220, Easing.CubicOut);
         await ShowPoiInfoSheetAsync(poi);
+    }
+
+    private void OnZoomInClicked(object sender, EventArgs e)
+    {
+        ZoomMap(true);
+    }
+
+    private void OnZoomOutClicked(object sender, EventArgs e)
+    {
+        ZoomMap(false);
+    }
+
+    private void ZoomMap(bool zoomIn)
+    {
+        if (touristMap.VisibleRegion == null)
+            return;
+
+        var center = touristMap.VisibleRegion.Center;
+        var currentRadiusKm = Math.Max((touristMap.VisibleRegion.LatitudeDegrees * 111d) / 2d, 0.03d);
+        var targetRadiusKm = zoomIn
+            ? currentRadiusKm / 1.6d
+            : currentRadiusKm * 1.6d;
+
+        targetRadiusKm = Math.Clamp(targetRadiusKm, 0.03d, 200d);
+
+        touristMap.MoveToRegion(MapSpan.FromCenterAndRadius(
+            center,
+            Distance.FromKilometers(targetRadiusKm)
+        ));
     }
 
     private async Task ShowPoiInfoSheetAsync(PointOfInterest poi)
@@ -409,13 +502,22 @@ public partial class MainPage : ContentPage
                 _startY = BottomSheet.TranslationY;
                 break;
             case GestureStatus.Running:
-                BottomSheet.TranslationY = Math.Clamp(_startY + e.TotalY, 0, 280);
+                BottomSheet.TranslationY = Math.Clamp(_startY + e.TotalY, BottomSheetExpandedY, BottomSheetCollapsedY);
                 break;
             case GestureStatus.Completed:
-                _ = BottomSheet.TranslationY > 140
-                    ? BottomSheet.TranslateTo(0, 280, 200, Easing.CubicOut)
-                    : BottomSheet.TranslateTo(0, 0, 200, Easing.CubicOut);
+                _ = BottomSheet.TranslationY > BottomSheetSnapThresholdY
+                    ? BottomSheet.TranslateTo(0, BottomSheetCollapsedY, 180, Easing.CubicOut)
+                    : BottomSheet.TranslateTo(0, BottomSheetExpandedY, 180, Easing.CubicOut);
                 break;
         }
+    }
+
+    private async void OnBottomSheetHandleTapped(object sender, TappedEventArgs e)
+    {
+        var target = BottomSheet.TranslationY > BottomSheetSnapThresholdY
+            ? BottomSheetExpandedY
+            : BottomSheetCollapsedY;
+
+        await BottomSheet.TranslateTo(0, target, 180, Easing.CubicOut);
     }
 }

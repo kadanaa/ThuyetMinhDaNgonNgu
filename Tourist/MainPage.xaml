@@ -11,8 +11,34 @@
         <!-- BAN DO FULL SCREEN -->
         <maps:Map x:Name="touristMap"
                   IsShowingUser="True"
+                  MapClicked="OnMapClicked"
                   HorizontalOptions="Fill"
                   VerticalOptions="Fill" />
+
+        <!-- NUT PHONG TO / THU NHO MAP -->
+        <VerticalStackLayout Spacing="8"
+                             HorizontalOptions="Start"
+                             VerticalOptions="Start"
+                             Margin="12,96,0,0">
+            <Button x:Name="ZoomInButton"
+                    Text="＋"
+                    FontSize="22"
+                    WidthRequest="44"
+                    HeightRequest="44"
+                    CornerRadius="22"
+                    BackgroundColor="#EEFFFFFF"
+                    TextColor="#1A1A1A"
+                    Clicked="OnZoomInClicked" />
+            <Button x:Name="ZoomOutButton"
+                    Text="－"
+                    FontSize="22"
+                    WidthRequest="44"
+                    HeightRequest="44"
+                    CornerRadius="22"
+                    BackgroundColor="#EEFFFFFF"
+                    TextColor="#1A1A1A"
+                    Clicked="OnZoomOutClicked" />
+        </VerticalStackLayout>
 
         <!-- DB STATUS BADGE -->
         <Frame x:Name="DbStatusBadge"
@@ -48,20 +74,23 @@
                HeightRequest="370"
                TranslationY="180">
 
-            <Frame.GestureRecognizers>
-                <PanGestureRecognizer PanUpdated="OnPanUpdated"/>
-            </Frame.GestureRecognizers>
-
             <Grid RowDefinitions="Auto,Auto,*,Auto">
 
                 <!-- Thanh keo -->
-                <BoxView Grid.Row="0"
-                         HeightRequest="4"
-                         WidthRequest="40"
-                         BackgroundColor="#DDDDDD"
-                         HorizontalOptions="Center"
-                         CornerRadius="2"
-                         Margin="0,10,0,8"/>
+                <Grid Grid.Row="0"
+                      HeightRequest="34"
+                      BackgroundColor="Transparent">
+                    <Grid.GestureRecognizers>
+                        <PanGestureRecognizer PanUpdated="OnPanUpdated" />
+                        <TapGestureRecognizer Tapped="OnBottomSheetHandleTapped" />
+                    </Grid.GestureRecognizers>
+                    <BoxView HeightRequest="4"
+                             WidthRequest="52"
+                             BackgroundColor="#CFCFCF"
+                             HorizontalOptions="Center"
+                             VerticalOptions="Center"
+                             CornerRadius="2"/>
+                </Grid>
 
                 <!-- PICKER vi tri va ngon ngu -->
                 <Grid Grid.Row="1"
