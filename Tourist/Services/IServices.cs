@@ -35,4 +35,10 @@ namespace Tourist.Services
         void SetSimulatedLocation(decimal latitude, decimal longitude);
         Task<List<(string name, decimal latitude, decimal longitude)>> GetPredefinedLocationsAsync();
     }
+
+    public interface ITouristIdentityService
+    {
+        Task RegisterCurrentDeviceSessionAsync();
+        Task UpdateCurrentLocationAsync(decimal latitude, decimal longitude);
+    }
 }

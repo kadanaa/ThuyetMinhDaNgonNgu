@@ -14,6 +14,7 @@ public partial class MainPage : ContentPage
     private readonly ITranslationService _translationService;
     private readonly ITtsService _ttsService;
     private readonly ILocationService _locationService;
+    private readonly ITouristIdentityService _touristIdentityService;
     private readonly ThuyetMinhDbContext _context;
 
     private List<PointOfInterest> _currentPois = new();
@@ -25,6 +26,10 @@ public partial class MainPage : ContentPage
     private decimal _currentLon;
     private double _startY;
     private Circle _selectedLocationCircle;
+    private double _currentMapRadiusKm = 1d;
+#if ANDROID
+    private Android.Gms.Maps.GoogleMap? _nativeGoogleMap;
+#endif
     private const double BottomSheetExpandedY = 0;
     private const double BottomSheetCollapsedY = 280;
     private const double BottomSheetSnapThresholdY = 140;
@@ -34,13 +39,18 @@ public partial class MainPage : ContentPage
         ITranslationService translationService,
         ITtsService ttsService,
         ILocationService locationService,
+        ITouristIdentityService touristIdentityService,
         ThuyetMinhDbContext context)
     {
         InitializeComponent();
+#if ANDROID
+        touristMap.HandlerChanged += OnTouristMapHandlerChanged;
+#endif
         _poiService = poiService;
         _translationService = translationService;
         _ttsService = ttsService;
         _locationService = locationService;
+        _touristIdentityService = touristIdentityService;
         _context = context;
 
         _ = InitializeAsync();
@@ -53,6 +63,8 @@ public partial class MainPage : ContentPage
 
         try
         {
+            await _touristIdentityService.RegisterCurrentDeviceSessionAsync();
+
             var locations = await _locationService.GetPredefinedLocationsAsync();
             LocationPicker.ItemsSource = locations.Select(l => l.name).ToList();
             if (locations.Count > 0)
@@ -82,47 +94,12 @@ public partial class MainPage : ContentPage
         }
     }
 
-    // ----------------------------------------------------------------
-    // KIEM TRA KET NOI DATABASE
-    // Hien badge xanh/do goc tren man hinh
-    // ----------------------------------------------------------------
-    //private async Task CheckDbConnectionAsync()
-    //{
-    //    try
-    //    {
-    //        // SetStatus: dang kiem tra
-    //        SetDbStatus(status: "checking");
-
-    //        // Lenh don gian nhat de test connection: dem so ban ghi
-    //        var count = await _context.Database.ExecuteSqlRawAsync("SELECT 1");
-
-    //        // Neu khong throw exception = ket noi thanh cong
-    //        // Lay them thong tin so luong POI de hien thi
-    //        var poiCount = await _context.PointsOfInterest.CountAsync();
-    //        var langCount = await _context.Languages.CountAsync();
-
-    //        SetDbStatus("ok", $"DB OK  {poiCount} POI  {langCount} ngon ngu");
-    //    }
-    //    catch (Exception ex)
-    //    {
-    //        Debug.WriteLine($"[DB Check] Failed: {ex.Message}");
-
-    //        // Lay thong bao loi ngan gon de hien len badge
-    //        var shortMsg = ex.Message.Length > 40
-    //            ? ex.Message[..40] + "..."
-    //            : ex.Message;
-
-    //        SetDbStatus("error", $"Loi DB: {shortMsg}");
-    //    }
-    //}
-
     private async Task CheckDbConnectionAsync()
     {
         try
         {
             SetDbStatus(status: "checking");
 
-            // ✅ SỬA Ở ĐÂY
             var canConnect = await _context.Database.CanConnectAsync();
 
             if (!canConnect)
@@ -130,20 +107,6 @@ public partial class MainPage : ContentPage
 
             var poiCount = await _context.PointsOfInterest.CountAsync();
             var langCount = await _context.Languages.CountAsync();
-
-            //// THÊM: dùng raw SQL để lấy list
-            //var rawList = await _context.PointsOfInterest
-            //    .FromSqlRaw("SELECT * FROM PointsOfInterest")
-            //    .ToListAsync();
-
-            //// THÊM: dùng EF bình thường
-            //var efList = await _context.PointsOfInterest.ToListAsync();
-
-            //await MainThread.InvokeOnMainThreadAsync(() =>
-            //    DisplayAlert("Debug",
-            //        $"CountAsync = {poiCount}\n" +
-            //        $"FromSqlRaw count = {rawList.Count}\n" +
-            //        $"ToListAsync count = {efList.Count}", "OK"));
 
             SetDbStatus("ok", $"ACTIVE");
         }
@@ -222,8 +185,8 @@ public partial class MainPage : ContentPage
     {
         try
         {
-            var latitude = (decimal)e.Location.Latitude;
-            var longitude = (decimal)e.Location.Longitude;
+            var latitude = Math.Round((decimal)e.Location.Latitude, 8, MidpointRounding.AwayFromZero);
+            var longitude = Math.Round((decimal)e.Location.Longitude, 8, MidpointRounding.AwayFromZero);
 
             _locationService.SetSimulatedLocation(latitude, longitude);
             _currentLat = latitude;
@@ -268,35 +231,14 @@ public partial class MainPage : ContentPage
             PoiCollectionView.ItemsSource = null;
 
             (_currentLat, _currentLon) = await _locationService.GetCurrentLocationAsync();
+            await _touristIdentityService.UpdateCurrentLocationAsync(_currentLat, _currentLon);
 
-            touristMap.MoveToRegion(
-                MapSpan.FromCenterAndRadius(
-                    new Location((double)_currentLat, (double)_currentLon),
-                    Distance.FromKilometers(1)
-                )
-            );
+            MoveMapToRegion(new Location((double)_currentLat, (double)_currentLon), 1d);
 
             touristMap.Pins.Clear();
             _pinToPoiMap.Clear();
 
             _currentPois = await _poiService.GetNearbyPOIsAsync(_currentLat, _currentLon);
-
-            int poicount = await _poiService.CountPOIsAsync();
-            //var count = await _context.PointsOfInterest.CountAsync();
-            //var list = await _context.PointsOfInterest.ToListAsync();
-
-            //// Thêm dòng này tạm thời để debug:
-            //System.Diagnostics.Debug.WriteLine(
-            //    $"[DEBUG] Tìm tại ({_currentLat:F6}, {_currentLon:F6}) → {_currentPois.Count} POI");
-            //if (_currentPois.Count == 0)
-            //    await DisplayAlert("Debug",
-            //        $"Query tại ({_currentLat:F6}, {_currentLon:F6})\nKết quả: 0 POI\nKiểm tra Output window", "OK");
-
-            //System.Diagnostics.Debug.WriteLine(
-            //    $"[DEBUG] Tìm tại ({_currentLat:F6}, {_currentLon:F6}) → {_currentPois.Count} POI");
-            //if (_currentPois.Count == 0)
-            //    await DisplayAlert("Debug",
-            //        $"CountAsync = {count}, List.Count = {list.Count}\nKết quả: 0 POI\nKiểm tra Output window", "OK");
 
             foreach (var poi in _currentPois)
             {
@@ -357,15 +299,21 @@ public partial class MainPage : ContentPage
     {
         _selectedPoi = poi;
 
-        touristMap.MoveToRegion(
-            MapSpan.FromCenterAndRadius(
-                new Location((double)poi.Latitude, (double)poi.Longitude),
-                Distance.FromKilometers(0.2)
-            )
-        );
+        MoveMapToRegion(new Location((double)poi.Latitude, (double)poi.Longitude), 0.2d);
 
         await BottomSheet.TranslateTo(0, BottomSheetCollapsedY, 220, Easing.CubicOut);
         await ShowPoiInfoSheetAsync(poi);
+    }
+
+    private void MoveMapToRegion(Location center, double radiusKm)
+    {
+        _currentMapRadiusKm = Math.Clamp(radiusKm, 0.03d, 200d);
+        touristMap.MoveToRegion(
+            MapSpan.FromCenterAndRadius(
+                center,
+                Distance.FromKilometers(_currentMapRadiusKm)
+            )
+        );
     }
 
     private void OnZoomInClicked(object sender, EventArgs e)
@@ -380,22 +328,64 @@ public partial class MainPage : ContentPage
 
     private void ZoomMap(bool zoomIn)
     {
-        if (touristMap.VisibleRegion == null)
-            return;
+#if ANDROID
+        if (_nativeGoogleMap != null)
+        {
+            if (zoomIn)
+                _nativeGoogleMap.AnimateCamera(Android.Gms.Maps.CameraUpdateFactory.ZoomIn());
+            else
+                _nativeGoogleMap.AnimateCamera(Android.Gms.Maps.CameraUpdateFactory.ZoomOut());
 
-        var center = touristMap.VisibleRegion.Center;
-        var currentRadiusKm = Math.Max((touristMap.VisibleRegion.LatitudeDegrees * 111d) / 2d, 0.03d);
+            return;
+        }
+#endif
+
+        var center = touristMap.VisibleRegion?.Center
+            ?? new Location((double)_currentLat, (double)_currentLon);
+
+        var currentRadiusKm = _currentMapRadiusKm;
+        if (touristMap.VisibleRegion != null)
+        {
+            var visibleRadiusKm = (touristMap.VisibleRegion.LatitudeDegrees * 111d) / 2d;
+            if (double.IsFinite(visibleRadiusKm) && visibleRadiusKm > 0.05d)
+            {
+                currentRadiusKm = visibleRadiusKm;
+            }
+        }
+
         var targetRadiusKm = zoomIn
             ? currentRadiusKm / 1.6d
             : currentRadiusKm * 1.6d;
 
-        targetRadiusKm = Math.Clamp(targetRadiusKm, 0.03d, 200d);
-
-        touristMap.MoveToRegion(MapSpan.FromCenterAndRadius(
-            center,
-            Distance.FromKilometers(targetRadiusKm)
-        ));
+        MoveMapToRegion(center, targetRadiusKm);
     }
+
+#if ANDROID
+    private void OnTouristMapHandlerChanged(object? sender, EventArgs e)
+    {
+        if (touristMap.Handler?.PlatformView is Android.Gms.Maps.MapView mapView)
+        {
+            mapView.GetMapAsync(new ZoomControlsMapCallback(gMap => _nativeGoogleMap = gMap));
+        }
+    }
+
+    private sealed class ZoomControlsMapCallback : Java.Lang.Object, Android.Gms.Maps.IOnMapReadyCallback
+    {
+        private readonly Action<Android.Gms.Maps.GoogleMap> _onReady;
+
+        public ZoomControlsMapCallback(Action<Android.Gms.Maps.GoogleMap> onReady)
+        {
+            _onReady = onReady;
+        }
+
+        public void OnMapReady(Android.Gms.Maps.GoogleMap googleMap)
+        {
+            _onReady(googleMap);
+            googleMap.UiSettings.ZoomControlsEnabled = true;
+            googleMap.UiSettings.ZoomGesturesEnabled = true;
+        }
+    }
+#endif
 
     private async Task ShowPoiInfoSheetAsync(PointOfInterest poi)
     {

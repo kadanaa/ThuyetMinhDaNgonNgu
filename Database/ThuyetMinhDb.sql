@@ -218,6 +218,58 @@ END
 GO
 
 -- =============================================
+-- 9. TOURIST SESSIONS TABLE - Định danh anonymous tourist theo DeviceId + IP metadata
+-- =============================================
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[TouristSessions]') AND type in (N'U'))
+BEGIN
+    CREATE TABLE [dbo].[TouristSessions]
+    (
+        [SessionId] INT PRIMARY KEY IDENTITY(1,1),
+        [DeviceId] NVARCHAR(100) NOT NULL UNIQUE,
+        [IPAddress] NVARCHAR(50),
+        [Platform] NVARCHAR(30),
+        [CurrentLatitude] DECIMAL(10, 8),
+        [CurrentLongitude] DECIMAL(11, 8),
+        [IsActive] BIT NOT NULL DEFAULT 1,
+        [FirstSeenUtc] DATETIME NOT NULL DEFAULT GETUTCDATE(),
+        [LastSeenUtc] DATETIME NOT NULL DEFAULT GETUTCDATE()
+    );
+
+    CREATE INDEX IX_TouristSessions_LastSeenUtc ON [dbo].[TouristSessions]([LastSeenUtc]);
+END
+GO
+
+IF COL_LENGTH('dbo.TouristSessions', 'CurrentLatitude') IS NULL
+BEGIN
+    ALTER TABLE [dbo].[TouristSessions] ADD [CurrentLatitude] DECIMAL(10, 8) NULL;
+END
+GO
+
+IF COL_LENGTH('dbo.TouristSessions', 'CurrentLatitude') IS NOT NULL
+BEGIN
+    ALTER TABLE [dbo].[TouristSessions] ALTER COLUMN [CurrentLatitude] DECIMAL(10, 8) NULL;
+END
+GO
+
+IF COL_LENGTH('dbo.TouristSessions', 'CurrentLongitude') IS NULL
+BEGIN
+    ALTER TABLE [dbo].[TouristSessions] ADD [CurrentLongitude] DECIMAL(11, 8) NULL;
+END
+GO
+
+IF COL_LENGTH('dbo.TouristSessions', 'CurrentLongitude') IS NOT NULL
+BEGIN
+    ALTER TABLE [dbo].[TouristSessions] ALTER COLUMN [CurrentLongitude] DECIMAL(11, 8) NULL;
+END
+GO
+
+IF COL_LENGTH('dbo.TouristSessions', 'IsActive') IS NULL
+BEGIN
+    ALTER TABLE [dbo].[TouristSessions] ADD [IsActive] BIT NOT NULL CONSTRAINT DF_TouristSessions_IsActive DEFAULT 1;
+END
+GO
+
+-- =============================================
 -- INSERT INITIAL DATA
 -- =============================================
 
@@ -346,6 +398,44 @@ BEGIN
     VALUES (@POIId, @OwnerId, @RequestType, @RequestData);
 
     SELECT SCOPE_IDENTITY() AS [NewRequestId];
+END
+GO
+
+-- Stored Procedure: Upsert Tourist Session by DeviceId
+CREATE OR ALTER PROCEDURE [dbo].[sp_UpsertTouristSession]
+    @DeviceId NVARCHAR(100),
+    @IPAddress NVARCHAR(50) = NULL,
+    @Platform NVARCHAR(30) = NULL,
+    @CurrentLatitude DECIMAL(10, 8) = NULL,
+    @CurrentLongitude DECIMAL(11, 8) = NULL,
+    @IsActive BIT = 1,
+    @OfflineAfterMinutes INT = 1
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    UPDATE [dbo].[TouristSessions]
+    SET [IsActive] = 0
+    WHERE [LastSeenUtc] < DATEADD(MINUTE, -@OfflineAfterMinutes, GETUTCDATE())
+      AND [IsActive] = 1;
+
+    IF EXISTS (SELECT 1 FROM [dbo].[TouristSessions] WHERE [DeviceId] = @DeviceId)
+    BEGIN
+        UPDATE [dbo].[TouristSessions]
+        SET
+            [IPAddress] = COALESCE(@IPAddress, [IPAddress]),
+            [Platform] = COALESCE(@Platform, [Platform]),
+            [CurrentLatitude] = COALESCE(@CurrentLatitude, [CurrentLatitude]),
+            [CurrentLongitude] = COALESCE(@CurrentLongitude, [CurrentLongitude]),
+            [IsActive] = 1,
+            [LastSeenUtc] = GETUTCDATE()
+        WHERE [DeviceId] = @DeviceId;
+    END
+    ELSE
+    BEGIN
+        INSERT INTO [dbo].[TouristSessions] ([DeviceId], [IPAddress], [Platform], [CurrentLatitude], [CurrentLongitude], [IsActive])
+        VALUES (@DeviceId, @IPAddress, @Platform, @CurrentLatitude, @CurrentLongitude, 1);
+    END
 END
 GO
 

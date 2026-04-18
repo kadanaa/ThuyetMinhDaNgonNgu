@@ -47,6 +47,8 @@
             txtRegisterUsername = new TextBox();
             lblRegisterUsername = new Label();
             grpRequests = new GroupBox();
+            btnRefresh = new Button();
+            btnSendUpdateRequest = new Button();
             btnSendDeleteRequest = new Button();
             btnLogout = new Button();
             cmbMyPois = new ComboBox();
@@ -251,6 +253,8 @@
             // 
             // grpRequests
             // 
+            grpRequests.Controls.Add(btnRefresh);
+            grpRequests.Controls.Add(btnSendUpdateRequest);
             grpRequests.Controls.Add(btnSendDeleteRequest);
             grpRequests.Controls.Add(btnLogout);
             grpRequests.Controls.Add(cmbMyPois);
@@ -286,6 +290,30 @@
             grpRequests.TabStop = false;
             grpRequests.Text = "Gửi request cho Admin";
             // 
+            // btnRefresh
+            // 
+            btnRefresh.BackColor = Color.FromArgb(0, 123, 255);
+            btnRefresh.ForeColor = Color.White;
+            btnRefresh.Location = new Point(1009, 31);
+            btnRefresh.Name = "btnRefresh";
+            btnRefresh.Size = new Size(131, 24);
+            btnRefresh.TabIndex = 28;
+            btnRefresh.Text = "Refresh";
+            btnRefresh.UseVisualStyleBackColor = false;
+            btnRefresh.Click += btnRefresh_Click;
+            // 
+            // btnSendUpdateRequest
+            // 
+            btnSendUpdateRequest.BackColor = Color.FromArgb(255, 193, 7);
+            btnSendUpdateRequest.ForeColor = Color.Black;
+            btnSendUpdateRequest.Location = new Point(989, 448);
+            btnSendUpdateRequest.Name = "btnSendUpdateRequest";
+            btnSendUpdateRequest.Size = new Size(151, 28);
+            btnSendUpdateRequest.TabIndex = 27;
+            btnSendUpdateRequest.Text = "Gửi request sửa";
+            btnSendUpdateRequest.UseVisualStyleBackColor = false;
+            btnSendUpdateRequest.Click += btnSendUpdateRequest_Click;
+            // 
             // btnSendDeleteRequest
             // 
             btnSendDeleteRequest.BackColor = Color.FromArgb(220, 53, 69);
@@ -318,6 +346,7 @@
             cmbMyPois.Name = "cmbMyPois";
             cmbMyPois.Size = new Size(302, 28);
             cmbMyPois.TabIndex = 24;
+            cmbMyPois.SelectedIndexChanged += cmbMyPois_SelectedIndexChanged;
             // 
             // lblMyPois
             // 
@@ -536,7 +565,7 @@
             MinimumSize = new Size(1202, 748);
             Name = "Form1";
             StartPosition = FormStartPosition.CenterScreen;
-            Text = "POI Owner - Gửi request cho Admin";
+            Text = "POI Owner App";
             grpLogin.ResumeLayout(false);
             grpLogin.PerformLayout();
             grpRequests.ResumeLayout(false);
@@ -564,6 +593,8 @@
         private TextBox txtRegisterUsername;
         private Label lblRegisterUsername;
         private GroupBox grpRequests;
+        private Button btnRefresh;
+        private Button btnSendUpdateRequest;
         private Button btnSendDeleteRequest;
         private Button btnLogout;
         private ComboBox cmbMyPois;

@@ -13,30 +13,39 @@
                   IsShowingUser="True"
                   MapClicked="OnMapClicked"
                   HorizontalOptions="Fill"
-                  VerticalOptions="Fill" />
+                  VerticalOptions="Fill"
+                  ZIndex="0" />
 
-        <!-- NUT PHONG TO / THU NHO MAP -->
-        <VerticalStackLayout Spacing="8"
+        <!-- NUT ZOOM (kieu Google) -->
+        <VerticalStackLayout Spacing="6"
                              HorizontalOptions="Start"
                              VerticalOptions="Start"
-                             Margin="12,96,0,0">
+                             Margin="12,96,0,0"
+                             ZIndex="30"
+                             InputTransparent="False">
             <Button x:Name="ZoomInButton"
-                    Text="＋"
-                    FontSize="22"
-                    WidthRequest="44"
-                    HeightRequest="44"
-                    CornerRadius="22"
-                    BackgroundColor="#EEFFFFFF"
+                    Text="+"
+                    FontSize="20"
+                    WidthRequest="42"
+                    HeightRequest="42"
+                    CornerRadius="4"
+                    BackgroundColor="White"
                     TextColor="#1A1A1A"
+                    BorderColor="#D0D0D0"
+                    BorderWidth="1"
+                    Padding="0"
                     Clicked="OnZoomInClicked" />
             <Button x:Name="ZoomOutButton"
-                    Text="－"
-                    FontSize="22"
-                    WidthRequest="44"
-                    HeightRequest="44"
-                    CornerRadius="22"
-                    BackgroundColor="#EEFFFFFF"
+                    Text="−"
+                    FontSize="20"
+                    WidthRequest="42"
+                    HeightRequest="42"
+                    CornerRadius="4"
+                    BackgroundColor="White"
                     TextColor="#1A1A1A"
+                    BorderColor="#D0D0D0"
+                    BorderWidth="1"
+                    Padding="0"
                     Clicked="OnZoomOutClicked" />
         </VerticalStackLayout>
 
@@ -48,7 +57,8 @@
                HorizontalOptions="Start"
                VerticalOptions="Start"
                Margin="12,48,0,0"
-               BackgroundColor="#DDFFFFFF">
+               BackgroundColor="#DDFFFFFF"
+               ZIndex="20">
             <StackLayout Orientation="Horizontal" Spacing="5">
                 <BoxView x:Name="DbStatusDot"
                          WidthRequest="8"
@@ -72,7 +82,8 @@
                HasShadow="True"
                VerticalOptions="End"
                HeightRequest="370"
-               TranslationY="180">
+               TranslationY="180"
+               ZIndex="25">
 
             <Grid RowDefinitions="Auto,Auto,*,Auto">
 
@@ -287,7 +298,8 @@
                Padding="24,16"
                HorizontalOptions="Center"
                VerticalOptions="Center"
-               HasShadow="False">
+               HasShadow="False"
+               ZIndex="40">
             <StackLayout Orientation="Horizontal" Spacing="12">
                 <ActivityIndicator IsRunning="True"
                                    Color="White"

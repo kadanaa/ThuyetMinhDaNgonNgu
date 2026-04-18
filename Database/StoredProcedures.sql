@@ -308,9 +308,14 @@ CREATE OR ALTER PROCEDURE [dbo].[sp_ApprovePOIRequest]
     AS
     BEGIN
         DECLARE @POIId INT;
+        DECLARE @RequestType NVARCHAR(50);
 
         -- Get POI ID from request
-        SELECT @POIId = [POIId] FROM [dbo].[POIApprovalRequests] WHERE [RequestId] = @RequestId;
+        SELECT
+            @POIId = [POIId],
+            @RequestType = [RequestType]
+        FROM [dbo].[POIApprovalRequests]
+        WHERE [RequestId] = @RequestId;
 
         -- Update request status
         UPDATE [dbo].[POIApprovalRequests]
@@ -321,14 +326,25 @@ CREATE OR ALTER PROCEDURE [dbo].[sp_ApprovePOIRequest]
             [AdminComments] = @Comments
         WHERE [RequestId] = @RequestId;
 
-        -- Update POI approval status
-        UPDATE [dbo].[PointsOfInterest]
-        SET 
-            [IsApproved] = 1,
-            [ApprovedDate] = GETUTCDATE(),
-            [ApprovedBy] = @AdminId,
-            [Status] = 'Active'
-        WHERE [POIId] = @POIId;
+        -- Update POI status by request type
+        IF @RequestType = 'Delete'
+        BEGIN
+            UPDATE [dbo].[PointsOfInterest]
+            SET
+                [IsApproved] = 0,
+                [LastModifiedDate] = GETUTCDATE()
+            WHERE [POIId] = @POIId;
+        END
+        ELSE
+        BEGIN
+            UPDATE [dbo].[PointsOfInterest]
+            SET
+                [IsApproved] = 1,
+                [ApprovedDate] = GETUTCDATE(),
+                [ApprovedBy] = @AdminId,
+                [Status] = 'Active'
+            WHERE [POIId] = @POIId;
+        END
 END
 GO
 
@@ -339,6 +355,15 @@ CREATE OR ALTER PROCEDURE [dbo].[sp_RejectPOIRequest]
         @Comments NVARCHAR(MAX)
     AS
     BEGIN
+        DECLARE @POIId INT;
+        DECLARE @RequestType NVARCHAR(50);
+
+        SELECT
+            @POIId = [POIId],
+            @RequestType = [RequestType]
+        FROM [dbo].[POIApprovalRequests]
+        WHERE [RequestId] = @RequestId;
+
         UPDATE [dbo].[POIApprovalRequests]
         SET 
             [Status] = 'Rejected',
@@ -346,6 +371,15 @@ CREATE OR ALTER PROCEDURE [dbo].[sp_RejectPOIRequest]
             [ReviewedBy] = @AdminId,
             [AdminComments] = @Comments
         WHERE [RequestId] = @RequestId;
+
+        IF @RequestType = 'Create' AND @POIId IS NOT NULL
+        BEGIN
+            UPDATE [dbo].[PointsOfInterest]
+            SET
+                [Status] = N'Rejected',
+                [LastModifiedDate] = GETUTCDATE()
+            WHERE [POIId] = @POIId;
+        END
 END
 GO
 
@@ -454,7 +488,51 @@ END
 GO
 
 -- =====================================================
--- 7. STATISTICS PROCEDURES
+-- 7. TOURIST IDENTITY PROCEDURES
+-- =====================================================
+
+-- Procedure: Upsert tourist session by DeviceId (không tạo thêm dòng khi mở lại app)
+CREATE OR ALTER PROCEDURE [dbo].[sp_UpsertTouristSession]
+        @DeviceId NVARCHAR(100),
+        @IPAddress NVARCHAR(50) = NULL,
+        @Platform NVARCHAR(30) = NULL,
+        @CurrentLatitude DECIMAL(10, 8) = NULL,
+        @CurrentLongitude DECIMAL(11, 8) = NULL,
+        @IsActive BIT = 1,
+        @OfflineAfterMinutes INT = 1
+    AS
+    BEGIN
+        SET NOCOUNT ON;
+
+        UPDATE [dbo].[TouristSessions]
+        SET [IsActive] = 0
+        WHERE [LastSeenUtc] < DATEADD(MINUTE, -@OfflineAfterMinutes, GETUTCDATE())
+          AND [IsActive] = 1;
+
+        IF EXISTS (SELECT 1 FROM [dbo].[TouristSessions] WHERE [DeviceId] = @DeviceId)
+        BEGIN
+            UPDATE [dbo].[TouristSessions]
+            SET
+                [IPAddress] = COALESCE(@IPAddress, [IPAddress]),
+                [Platform] = COALESCE(@Platform, [Platform]),
+                [CurrentLatitude] = COALESCE(@CurrentLatitude, [CurrentLatitude]),
+                [CurrentLongitude] = COALESCE(@CurrentLongitude, [CurrentLongitude]),
+                [IsActive] = 1,
+                [LastSeenUtc] = GETUTCDATE()
+            WHERE [DeviceId] = @DeviceId;
+        END
+        ELSE
+        BEGIN
+            INSERT INTO [dbo].[TouristSessions]
+                ([DeviceId], [IPAddress], [Platform], [CurrentLatitude], [CurrentLongitude], [IsActive])
+            VALUES
+                (@DeviceId, @IPAddress, @Platform, @CurrentLatitude, @CurrentLongitude, 1);
+        END
+END
+GO
+
+-- =====================================================
+-- 8. STATISTICS PROCEDURES
 -- =====================================================
 
 -- Procedure: Get dashboard statistics

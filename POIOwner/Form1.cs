@@ -2,6 +2,7 @@ using System.Data;
 using System.Globalization;
 using System.Text.Json;
 using Microsoft.Data.SqlClient;
+using Microsoft.Web.WebView2.WinForms;
 
 namespace POIOwner
 {
@@ -11,15 +12,387 @@ namespace POIOwner
             "Server=localhost;Database=ThuyetMinhDaNgonNgu;Integrated Security=true;TrustServerCertificate=true;Connection Timeout=30;";
 
         private int _currentOwnerId;
+        private readonly TabControl _mainTabControl = new() { Dock = DockStyle.Fill };
+        private readonly TabPage _tabRequests = new() { Text = "Request của tôi" };
+        private readonly TabPage _tabPoiEditor = new() { Text = "POI & Bản đồ" };
+        private readonly WebView2 _poiPreviewMap = new() { Dock = DockStyle.Fill };
+        private bool _responsiveLayoutInitialized;
 
         public Form1()
         {
             InitializeComponent();
+            InitializeResponsiveLayout();
 
             txtUsername.Text = "poiowner01";
             txtPassword.Text = "Admin@123";
 
             ShowLoginOnlyMode();
+        }
+
+        private void InitializeResponsiveLayout()
+        {
+            if (_responsiveLayoutInitialized)
+                return;
+
+            _responsiveLayoutInitialized = true;
+
+            grpLogin.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            grpRequests.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+
+            grpRequests.Controls.Clear();
+            grpRequests.Controls.Add(_mainTabControl);
+
+            _mainTabControl.TabPages.Clear();
+            _mainTabControl.TabPages.Add(_tabRequests);
+            _mainTabControl.TabPages.Add(_tabPoiEditor);
+
+            SetupRequestsTabLayout();
+            SetupPoiEditorTabLayout();
+
+            txtLatitude.TextChanged += async (_, _) => await RefreshPoiPreviewMapAsync();
+            txtLongitude.TextChanged += async (_, _) => await RefreshPoiPreviewMapAsync();
+        }
+
+        private void SetupRequestsTabLayout()
+        {
+            _tabRequests.Controls.Clear();
+
+            var root = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 1,
+                RowCount = 2,
+                Padding = new Padding(10)
+            };
+            root.RowStyles.Add(new RowStyle(SizeType.Absolute, 40));
+            root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+
+            var header = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 3,
+                RowCount = 1
+            };
+            header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140));
+            header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140));
+
+            lblMyRequests.Dock = DockStyle.Fill;
+            lblMyRequests.TextAlign = ContentAlignment.MiddleLeft;
+            header.Controls.Add(lblMyRequests, 0, 0);
+
+            btnRefresh.Dock = DockStyle.Fill;
+            btnRefresh.Margin = new Padding(4, 2, 4, 2);
+            header.Controls.Add(btnRefresh, 1, 0);
+
+            btnLogout.Dock = DockStyle.Fill;
+            btnLogout.Margin = new Padding(4, 2, 0, 2);
+            header.Controls.Add(btnLogout, 2, 0);
+
+            dgvMyRequests.Dock = DockStyle.Fill;
+
+            root.Controls.Add(header, 0, 0);
+            root.Controls.Add(dgvMyRequests, 0, 1);
+            _tabRequests.Controls.Add(root);
+        }
+
+        private void SetupPoiEditorTabLayout()
+        {
+            _tabPoiEditor.Controls.Clear();
+
+            var split = new SplitContainer
+            {
+                Dock = DockStyle.Fill,
+                Orientation = Orientation.Vertical,
+                SplitterDistance = 640
+            };
+
+            var leftRoot = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 2,
+                RowCount = 7,
+                Padding = new Padding(10)
+            };
+            leftRoot.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 100));
+            leftRoot.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            leftRoot.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
+            leftRoot.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
+            leftRoot.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
+            leftRoot.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
+            leftRoot.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
+            leftRoot.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
+            leftRoot.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+
+            AddEditorRow(leftRoot, 0, lblPoiName, txtPoiName);
+            AddEditorRow(leftRoot, 1, lblDescription, txtDescription);
+
+            var latLonPanel = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 4 };
+            latLonPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 70));
+            latLonPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            latLonPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 80));
+            latLonPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            lblLatitude.Dock = DockStyle.Fill;
+            lblLatitude.TextAlign = ContentAlignment.MiddleLeft;
+            txtLatitude.Dock = DockStyle.Fill;
+            lblLongitude.Dock = DockStyle.Fill;
+            lblLongitude.TextAlign = ContentAlignment.MiddleLeft;
+            txtLongitude.Dock = DockStyle.Fill;
+            latLonPanel.Controls.Add(lblLatitude, 0, 0);
+            latLonPanel.Controls.Add(txtLatitude, 1, 0);
+            latLonPanel.Controls.Add(lblLongitude, 2, 0);
+            latLonPanel.Controls.Add(txtLongitude, 3, 0);
+            leftRoot.Controls.Add(new Label { Text = "Tọa độ", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft }, 0, 2);
+            leftRoot.Controls.Add(latLonPanel, 1, 2);
+
+            var radiusCategoryPanel = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 4 };
+            radiusCategoryPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 70));
+            radiusCategoryPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            radiusCategoryPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 80));
+            radiusCategoryPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            lblRadius.Dock = DockStyle.Fill;
+            lblRadius.TextAlign = ContentAlignment.MiddleLeft;
+            txtRadius.Dock = DockStyle.Fill;
+            lblCategory.Dock = DockStyle.Fill;
+            lblCategory.TextAlign = ContentAlignment.MiddleLeft;
+            txtCategory.Dock = DockStyle.Fill;
+            radiusCategoryPanel.Controls.Add(lblRadius, 0, 0);
+            radiusCategoryPanel.Controls.Add(txtRadius, 1, 0);
+            radiusCategoryPanel.Controls.Add(lblCategory, 2, 0);
+            radiusCategoryPanel.Controls.Add(txtCategory, 3, 0);
+            leftRoot.Controls.Add(new Label { Text = "Thông số", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft }, 0, 3);
+            leftRoot.Controls.Add(radiusCategoryPanel, 1, 3);
+
+            AddEditorRow(leftRoot, 4, lblAddress, txtAddress);
+
+            var phoneWebsitePanel = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 4 };
+            phoneWebsitePanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 70));
+            phoneWebsitePanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            phoneWebsitePanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 80));
+            phoneWebsitePanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            lblPhone.Dock = DockStyle.Fill;
+            lblPhone.TextAlign = ContentAlignment.MiddleLeft;
+            txtPhone.Dock = DockStyle.Fill;
+            lblWebsite.Dock = DockStyle.Fill;
+            lblWebsite.TextAlign = ContentAlignment.MiddleLeft;
+            txtWebsite.Dock = DockStyle.Fill;
+            phoneWebsitePanel.Controls.Add(lblPhone, 0, 0);
+            phoneWebsitePanel.Controls.Add(txtPhone, 1, 0);
+            phoneWebsitePanel.Controls.Add(lblWebsite, 2, 0);
+            phoneWebsitePanel.Controls.Add(txtWebsite, 3, 0);
+            leftRoot.Controls.Add(new Label { Text = "Liên hệ", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft }, 0, 5);
+            leftRoot.Controls.Add(phoneWebsitePanel, 1, 5);
+
+            var actionPanel = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 3,
+                RowCount = 2
+            };
+            actionPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 45));
+            actionPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 27.5f));
+            actionPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 27.5f));
+            actionPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
+            actionPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
+
+            var deleteReasonPanel = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2 };
+            deleteReasonPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 24));
+            deleteReasonPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            lblDeleteReason.Dock = DockStyle.Fill;
+            lblDeleteReason.TextAlign = ContentAlignment.MiddleLeft;
+            txtDeleteReason.Dock = DockStyle.Fill;
+            txtDeleteReason.Multiline = true;
+            deleteReasonPanel.Controls.Add(lblDeleteReason, 0, 0);
+            deleteReasonPanel.Controls.Add(txtDeleteReason, 0, 1);
+            actionPanel.SetRowSpan(deleteReasonPanel, 2);
+            actionPanel.Controls.Add(deleteReasonPanel, 0, 0);
+
+            btnSendDeleteRequest.Dock = DockStyle.Fill;
+            btnSendDeleteRequest.Margin = new Padding(6, 4, 6, 4);
+            actionPanel.Controls.Add(btnSendDeleteRequest, 1, 0);
+
+            btnSendUpdateRequest.Dock = DockStyle.Fill;
+            btnSendUpdateRequest.Margin = new Padding(6, 4, 6, 4);
+            actionPanel.Controls.Add(btnSendUpdateRequest, 2, 0);
+
+            btnSendCreateRequest.Dock = DockStyle.Fill;
+            btnSendCreateRequest.Margin = new Padding(6, 4, 6, 4);
+            actionPanel.SetColumnSpan(btnSendCreateRequest, 2);
+            actionPanel.Controls.Add(btnSendCreateRequest, 1, 1);
+
+            leftRoot.Controls.Add(actionPanel, 1, 6);
+
+            split.Panel1.Controls.Add(leftRoot);
+
+            var rightRoot = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 1,
+                RowCount = 3,
+                Padding = new Padding(10)
+            };
+            rightRoot.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
+            rightRoot.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            rightRoot.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
+
+            var poiPickerPanel = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2 };
+            poiPickerPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 90));
+            poiPickerPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            lblMyPois.Dock = DockStyle.Fill;
+            lblMyPois.TextAlign = ContentAlignment.MiddleLeft;
+            cmbMyPois.Dock = DockStyle.Fill;
+            poiPickerPanel.Controls.Add(lblMyPois, 0, 0);
+            poiPickerPanel.Controls.Add(cmbMyPois, 1, 0);
+
+            _poiPreviewMap.Dock = DockStyle.Fill;
+
+            rightRoot.Controls.Add(poiPickerPanel, 0, 0);
+            rightRoot.Controls.Add(_poiPreviewMap, 0, 1);
+            rightRoot.Controls.Add(new Label
+            {
+                Text = "Bản đồ preview sẽ cập nhật theo Latitude/Longitude",
+                Dock = DockStyle.Fill,
+                TextAlign = ContentAlignment.MiddleLeft,
+                ForeColor = Color.DimGray
+            }, 0, 2);
+
+            split.Panel2.Controls.Add(rightRoot);
+
+            _tabPoiEditor.Controls.Add(split);
+        }
+
+        private static void AddEditorRow(TableLayoutPanel panel, int row, Control label, Control input)
+        {
+            label.Dock = DockStyle.Fill;
+            if (label is Label textLabel)
+                textLabel.TextAlign = ContentAlignment.MiddleLeft;
+
+            input.Dock = DockStyle.Fill;
+            panel.Controls.Add(label, 0, row);
+            panel.Controls.Add(input, 1, row);
+        }
+
+        private async Task RefreshPoiPreviewMapAsync()
+        {
+            if (!decimal.TryParse(txtLatitude.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out var lat) &&
+                !decimal.TryParse(txtLatitude.Text, NumberStyles.Float, CultureInfo.CurrentCulture, out lat))
+            {
+                return;
+            }
+
+            if (!decimal.TryParse(txtLongitude.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out var lon) &&
+                !decimal.TryParse(txtLongitude.Text, NumberStyles.Float, CultureInfo.CurrentCulture, out lon))
+            {
+                return;
+            }
+
+            await _poiPreviewMap.EnsureCoreWebView2Async();
+            var html = BuildPoiPreviewMapHtml((double)lat, (double)lon, txtPoiName.Text.Trim());
+            _poiPreviewMap.NavigateToString(html);
+        }
+
+        private static string BuildPoiPreviewMapHtml(double latitude, double longitude, string poiName)
+        {
+            var safeName = string.IsNullOrWhiteSpace(poiName) ? "POI" : poiName.Replace("'", "\\'");
+            return $@"<!DOCTYPE html>
+<html>
+<head>
+  <meta charset='utf-8'/>
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css'/>
+  <style>
+    html,body,#map {{ height:100%; margin:0; padding:0; }}
+  </style>
+</head>
+<body>
+  <div id='map'></div>
+  <script src='https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js'></script>
+  <script>
+    const lat = {latitude.ToString(CultureInfo.InvariantCulture)};
+    const lon = {longitude.ToString(CultureInfo.InvariantCulture)};
+    if (!window.L) {{
+      document.getElementById('map').innerHTML = `<div style='padding:12px;color:#c62828;font-family:Segoe UI'>Không tải được OpenStreetMap (Leaflet CDN).</div>`;
+    }} else {{
+      const map = L.map('map').setView([lat, lon], 16);
+      const providers = [
+        {{ url: 'https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png', attribution: '&copy; OpenStreetMap contributors' }},
+        {{ url: 'https://{{s}}.tile.openstreetmap.fr/hot/{{z}}/{{x}}/{{y}}.png', attribution: '&copy; OpenStreetMap contributors, HOT' }},
+        {{ url: 'https://{{s}}.basemaps.cartocdn.com/light_all/{{z}}/{{x}}/{{y}}.png', attribution: '&copy; OpenStreetMap contributors &copy; CARTO' }}
+      ];
+
+      let layer = null;
+      let providerIndex = 0;
+      let switched = false;
+
+      function applyLayer(index) {{
+        providerIndex = index;
+        switched = false;
+
+        if (layer) map.removeLayer(layer);
+
+        const p = providers[index];
+        layer = L.tileLayer(p.url, {{
+          maxZoom: 19,
+          subdomains: 'abc',
+          crossOrigin: true,
+          attribution: p.attribution
+        }});
+
+        layer.on('tileerror', function() {{
+          if (switched) return;
+          switched = true;
+          const next = providerIndex + 1;
+          if (next < providers.length) applyLayer(next);
+        }});
+
+        layer.addTo(map);
+      }}
+
+      applyLayer(0);
+
+      L.marker([lat, lon]).addTo(map).bindPopup('{safeName}').openPopup();
+    }}
+  </script>
+</body>
+</html>";
+        }
+
+        private async void cmbMyPois_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            if (_currentOwnerId <= 0 || cmbMyPois.SelectedValue == null)
+                return;
+
+            if (!int.TryParse(cmbMyPois.SelectedValue.ToString(), out var poiId))
+                return;
+
+            try
+            {
+                await LoadPoiDetailsToFormAsync(poiId);
+            }
+            catch
+            {
+            }
+        }
+
+        private async void btnRefresh_Click(object sender, EventArgs e)
+        {
+            if (_currentOwnerId <= 0)
+                return;
+
+            try
+            {
+                btnRefresh.Enabled = false;
+                await LoadMyPoisAsync();
+                await LoadMyRequestsAsync();
+                await RefreshPoiPreviewMapAsync();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Lỗi refresh dữ liệu: {ex.Message}", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                btnRefresh.Enabled = true;
+            }
         }
 
         private async void btnLogin_Click(object sender, EventArgs e)
@@ -80,6 +453,7 @@ namespace POIOwner
 
                 await LoadMyPoisAsync();
                 await LoadMyRequestsAsync();
+                await RefreshPoiPreviewMapAsync();
             }
             catch (Exception ex)
             {
@@ -88,6 +462,61 @@ namespace POIOwner
             finally
             {
                 btnLogin.Enabled = true;
+            }
+        }
+
+        private async void btnSendUpdateRequest_Click(object sender, EventArgs e)
+        {
+            if (cmbMyPois.SelectedValue == null)
+            {
+                MessageBox.Show("Vui lòng chọn POI của bạn để gửi request sửa.", "Thiếu dữ liệu", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            if (!TryGetCreatePoiInput(out var input, out var message))
+            {
+                MessageBox.Show(message, "Dữ liệu chưa hợp lệ", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            try
+            {
+                var poiId = Convert.ToInt32(cmbMyPois.SelectedValue);
+
+                var requestData = JsonSerializer.Serialize(new
+                {
+                    POIId = poiId,
+                    POIName = input.PoiName,
+                    input.Description,
+                    input.Latitude,
+                    input.Longitude,
+                    input.Radius,
+                    input.Category,
+                    input.Address,
+                    input.PhoneNumber,
+                    input.Website,
+                    Action = "Update"
+                });
+
+                await using var conn = new SqlConnection(_connectionString);
+                await conn.OpenAsync();
+
+                await using var cmd = new SqlCommand("sp_CreatePOIApprovalRequest", conn)
+                {
+                    CommandType = CommandType.StoredProcedure
+                };
+                cmd.Parameters.AddWithValue("@POIId", poiId);
+                cmd.Parameters.AddWithValue("@OwnerId", _currentOwnerId);
+                cmd.Parameters.AddWithValue("@RequestType", "Update");
+                cmd.Parameters.AddWithValue("@RequestData", requestData);
+                await cmd.ExecuteNonQueryAsync();
+
+                MessageBox.Show("Đã gửi request sửa POI cho admin.", "Thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                await LoadMyRequestsAsync();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Lỗi gửi request sửa POI: {ex.Message}", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -306,6 +735,8 @@ SELECT CAST(SCOPE_IDENTITY() AS INT);";
 SELECT [POIId], [POIName]
 FROM [dbo].[PointsOfInterest]
 WHERE [OwnerId] = @OwnerId
+  AND [IsApproved] = 1
+  AND ISNULL([Status], N'') <> N'Rejected'
 ORDER BY [POIName]";
 
             await using var cmd = new SqlCommand(sql, conn);
@@ -318,6 +749,42 @@ ORDER BY [POIName]";
             cmbMyPois.DataSource = table;
             cmbMyPois.DisplayMember = "POIName";
             cmbMyPois.ValueMember = "POIId";
+
+            if (table.Rows.Count > 0)
+            {
+                cmbMyPois.SelectedIndex = 0;
+                await LoadPoiDetailsToFormAsync(Convert.ToInt32(table.Rows[0]["POIId"]));
+            }
+        }
+
+        private async Task LoadPoiDetailsToFormAsync(int poiId)
+        {
+            await using var conn = new SqlConnection(_connectionString);
+            await conn.OpenAsync();
+
+            const string sql = @"
+SELECT [POIName], [Description], [Latitude], [Longitude], [Radius], [Category], [Address], [PhoneNumber], [Website]
+FROM [dbo].[PointsOfInterest]
+WHERE [POIId] = @POIId AND [OwnerId] = @OwnerId";
+
+            await using var cmd = new SqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("@POIId", poiId);
+            cmd.Parameters.AddWithValue("@OwnerId", _currentOwnerId);
+
+            await using var reader = await cmd.ExecuteReaderAsync();
+            if (!await reader.ReadAsync())
+                return;
+
+            txtPoiName.Text = reader["POIName"]?.ToString() ?? string.Empty;
+            txtDescription.Text = reader["Description"] == DBNull.Value ? string.Empty : reader["Description"]?.ToString() ?? string.Empty;
+            txtLatitude.Text = Convert.ToDecimal(reader["Latitude"]).ToString(CultureInfo.InvariantCulture);
+            txtLongitude.Text = Convert.ToDecimal(reader["Longitude"]).ToString(CultureInfo.InvariantCulture);
+            txtRadius.Text = Convert.ToDouble(reader["Radius"]).ToString(CultureInfo.InvariantCulture);
+            txtCategory.Text = reader["Category"] == DBNull.Value ? string.Empty : reader["Category"]?.ToString() ?? string.Empty;
+            txtAddress.Text = reader["Address"] == DBNull.Value ? string.Empty : reader["Address"]?.ToString() ?? string.Empty;
+            txtPhone.Text = reader["PhoneNumber"] == DBNull.Value ? string.Empty : reader["PhoneNumber"]?.ToString() ?? string.Empty;
+            txtWebsite.Text = reader["Website"] == DBNull.Value ? string.Empty : reader["Website"]?.ToString() ?? string.Empty;
+            await RefreshPoiPreviewMapAsync();
         }
 
         private async Task LoadMyRequestsAsync()
@@ -484,6 +951,7 @@ ORDER BY [RequestedDate] DESC";
             grpRequests.Visible = true;
             grpRequests.Enabled = true;
             grpRequests.Location = new Point(12, 12);
+            _mainTabControl.SelectedTab = _tabRequests;
             ClientSize = new Size(1184, 701);
             MinimumSize = new Size(1202, 748);
         }

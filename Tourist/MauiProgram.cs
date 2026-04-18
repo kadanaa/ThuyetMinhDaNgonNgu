@@ -27,6 +27,7 @@ namespace Tourist
             builder.Services.AddTransient<IPoiService, PoiService>();
             builder.Services.AddTransient<ITranslationService, TranslationService>();
             builder.Services.AddTransient<ITtsService, TtsService>();
+            builder.Services.AddTransient<ITouristIdentityService, TouristIdentityService>();
             builder.Services.AddSingleton<ILocationService, LocationService>();
             builder.Services.AddTransient<MainPage>();
 
