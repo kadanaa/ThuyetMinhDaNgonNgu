@@ -27,6 +27,9 @@ public partial class MainPage : ContentPage
     private double _startY;
     private Circle _selectedLocationCircle;
     private double _currentMapRadiusKm = 1d;
+    private CancellationTokenSource? _heartbeatCts;
+    private Task? _heartbeatTask;
+    private static readonly TimeSpan HeartbeatInterval = TimeSpan.FromSeconds(5);
 #if ANDROID
     private Android.Gms.Maps.GoogleMap? _nativeGoogleMap;
 #endif
@@ -54,6 +57,18 @@ public partial class MainPage : ContentPage
         _context = context;
 
         _ = InitializeAsync();
+    }
+
+    protected override void OnAppearing()
+    {
+        base.OnAppearing();
+        StartHeartbeat();
+    }
+
+    protected override void OnDisappearing()
+    {
+        base.OnDisappearing();
+        StopHeartbeat();
     }
 
     private async Task InitializeAsync()
@@ -314,6 +329,49 @@ public partial class MainPage : ContentPage
                 Distance.FromKilometers(_currentMapRadiusKm)
             )
         );
+    }
+
+    private void StartHeartbeat()
+    {
+        if (_heartbeatTask is { IsCompleted: false })
+            return;
+
+        _heartbeatCts = new CancellationTokenSource();
+        _heartbeatTask = RunHeartbeatLoopAsync(_heartbeatCts.Token);
+    }
+
+    private void StopHeartbeat()
+    {
+        if (_heartbeatCts == null)
+            return;
+
+        _heartbeatCts.Cancel();
+        _heartbeatCts.Dispose();
+        _heartbeatCts = null;
+    }
+
+    private async Task RunHeartbeatLoopAsync(CancellationToken cancellationToken)
+    {
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            try
+            {
+                await _touristIdentityService.HeartbeatAsync();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[Heartbeat] {ex.Message}");
+            }
+
+            try
+            {
+                await Task.Delay(HeartbeatInterval, cancellationToken);
+            }
+            catch (TaskCanceledException)
+            {
+                break;
+            }
+        }
     }
 
     private void OnZoomInClicked(object sender, EventArgs e)

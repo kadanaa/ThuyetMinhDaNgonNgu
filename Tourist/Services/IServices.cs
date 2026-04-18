@@ -40,5 +40,6 @@ namespace Tourist.Services
     {
         Task RegisterCurrentDeviceSessionAsync();
         Task UpdateCurrentLocationAsync(decimal latitude, decimal longitude);
+        Task HeartbeatAsync();
     }
 }

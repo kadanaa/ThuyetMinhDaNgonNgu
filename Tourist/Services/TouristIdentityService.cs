@@ -39,6 +39,18 @@ namespace Tourist.Services
             }
         }
 
+        public async Task HeartbeatAsync()
+        {
+            try
+            {
+                await UpsertSessionAsync(null, null);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[TouristIdentity] Cannot heartbeat: {ex}");
+            }
+        }
+
         public async Task UpdateCurrentLocationAsync(decimal latitude, decimal longitude)
         {
             try
