@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mở Tourist App</title>
+    <style>
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f6f8fa;
+            color: #1f2328;
+        }
+
+        .card {
+            width: min(560px, 92vw);
+            background: #fff;
+            border: 1px solid #d0d7de;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(31, 35, 40, 0.08);
+        }
+
+        h1 {
+            margin: 0 0 10px;
+            font-size: 20px;
+        }
+
+        p {
+            margin: 8px 0;
+            line-height: 1.4;
+        }
+
+        a {
+            color: #0969da;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Đang mở Tourist App...</h1>
+        <p id="status">Nếu thiết bị chưa cài ứng dụng, trang sẽ tự chuyển sang link tải.</p>
+        <p>
+            Link tải thủ công:
+            <a id="apkLink" href="#" rel="noopener noreferrer">Tải Tourist APK</a>
+        </p>
+    </div>
+
+    <script>
+        (function () {
+            var params = new URLSearchParams(window.location.search);
+            var poi = params.get('poi');
+            var apk = params.get('apk') || 'https://drive.google.com/uc?export=download&id=1VlaEo3imij4ua42_OMtgZCDKJ2eEVww_';
+            var deepLink = poi ? ('touristapp://poi/' + encodeURIComponent(poi)) : 'touristapp://poi';
+
+            var apkLink = document.getElementById('apkLink');
+            var status = document.getElementById('status');
+            if (apkLink) {
+                apkLink.href = apk;
+            }
+
+            if (status) {
+                status.textContent = 'Đang thử mở ứng dụng Tourist...';
+            }
+
+            var start = Date.now();
+            var redirected = false;
+
+            function goToApk() {
+                if (redirected) return;
+                redirected = true;
+                if (status) {
+                    status.textContent = 'Không phát hiện Tourist App. Đang chuyển sang link tải...';
+                }
+                window.location.replace(apk);
+            }
+
+            var fallbackTimer = setTimeout(goToApk, 1300);
+
+            document.addEventListener('visibilitychange', function () {
+                if (document.hidden) {
+                    clearTimeout(fallbackTimer);
+                }
+            });
+
+            try {
+                window.location.href = deepLink;
+            } catch (_) {
+                goToApk();
+                return;
+            }
+
+            setTimeout(function () {
+                if (Date.now() - start < 2500) {
+                    goToApk();
+                }
+            }, 1700);
+        })();
+    </script>
+</body>
+</html>

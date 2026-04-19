@@ -25,7 +25,9 @@ namespace POIOwner
             var touristApkUrl = configuration["AppLinks:TouristApkUrl"]
                 ?? throw new InvalidOperationException("Missing app link 'AppLinks:TouristApkUrl' in appsettings.json.");
 
-            Application.Run(new Form1(connectionString, touristApkUrl));
+            var touristQrBridgeUrl = configuration["AppLinks:TouristQrBridgeUrl"];
+
+            Application.Run(new Form1(connectionString, touristApkUrl, touristQrBridgeUrl));
         }
     }
 }

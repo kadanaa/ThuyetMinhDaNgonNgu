@@ -12,6 +12,7 @@ namespace POIOwner
     {
         private readonly string _connectionString;
         private readonly string _touristApkUrl;
+        private readonly string? _touristQrBridgeUrl;
         private const string TouristPackageName = "com.companyname.tourist";
 
         private int _currentOwnerId;
@@ -33,10 +34,11 @@ namespace POIOwner
         private bool _responsiveLayoutInitialized;
         private bool _poiMapBridgeInitialized;
 
-        public Form1(string connectionString, string touristApkUrl)
+        public Form1(string connectionString, string touristApkUrl, string? touristQrBridgeUrl)
         {
             _connectionString = connectionString;
             _touristApkUrl = touristApkUrl;
+            _touristQrBridgeUrl = touristQrBridgeUrl;
             InitializeComponent();
             InitializeResponsiveLayout();
 
@@ -507,6 +509,13 @@ namespace POIOwner
 
         private string BuildPoiIntentUrl(int poiId)
         {
+            if (!string.IsNullOrWhiteSpace(_touristQrBridgeUrl))
+            {
+                var separator = _touristQrBridgeUrl.Contains('?') ? "&" : "?";
+                var escapedApkUrl = Uri.EscapeDataString(_touristApkUrl);
+                return $"{_touristQrBridgeUrl}{separator}poi={poiId}&apk={escapedApkUrl}";
+            }
+
             var fallbackUrl = Uri.EscapeDataString(_touristApkUrl);
             return $"intent://poi/{poiId}#Intent;scheme=touristapp;package={TouristPackageName};S.browser_fallback_url={fallbackUrl};end";
         }
