@@ -3,23 +3,28 @@ using System.Globalization;
 using System.Text.Json;
 using Microsoft.Data.SqlClient;
 using Microsoft.Web.WebView2.WinForms;
+using QRCoder;
 
 namespace POIOwner
 {
     public partial class Form1 : Form
     {
-        private readonly string _connectionString =
-            "Server=localhost;Database=ThuyetMinhDaNgonNgu;Integrated Security=true;TrustServerCertificate=true;Connection Timeout=30;";
+        private readonly string _connectionString;
+        private readonly string _touristApkUrl;
+        private const string TouristPackageName = "com.companyname.tourist";
 
         private int _currentOwnerId;
         private readonly TabControl _mainTabControl = new() { Dock = DockStyle.Fill };
         private readonly TabPage _tabRequests = new() { Text = "Request của tôi" };
         private readonly TabPage _tabPoiEditor = new() { Text = "POI & Bản đồ" };
         private readonly WebView2 _poiPreviewMap = new() { Dock = DockStyle.Fill };
+        private readonly Button _btnShowPoiQr = new();
         private bool _responsiveLayoutInitialized;
 
-        public Form1()
+        public Form1(string connectionString, string touristApkUrl)
         {
+            _connectionString = connectionString;
+            _touristApkUrl = touristApkUrl;
             InitializeComponent();
             InitializeResponsiveLayout();
 
@@ -104,8 +109,27 @@ namespace POIOwner
             {
                 Dock = DockStyle.Fill,
                 Orientation = Orientation.Vertical,
-                SplitterDistance = 640
+                SplitterDistance = 430
             };
+
+            void ApplyBalancedSplit()
+            {
+                if (split.Width <= 0)
+                    return;
+
+                var desiredLeft = (int)(split.Width * 0.36);
+                var maxLeft = split.Width - 520;
+                if (maxLeft < 320)
+                    maxLeft = split.Width - 300;
+
+                desiredLeft = Math.Max(320, Math.Min(desiredLeft, maxLeft));
+
+                if (desiredLeft > 0 && desiredLeft < split.Width)
+                    split.SplitterDistance = desiredLeft;
+            }
+
+            split.SizeChanged += (_, _) => ApplyBalancedSplit();
+            split.HandleCreated += (_, _) => BeginInvoke((Action)ApplyBalancedSplit);
 
             var leftRoot = new TableLayoutPanel
             {
@@ -248,17 +272,133 @@ namespace POIOwner
 
             rightRoot.Controls.Add(poiPickerPanel, 0, 0);
             rightRoot.Controls.Add(_poiPreviewMap, 0, 1);
-            rightRoot.Controls.Add(new Label
+            var footerPanel = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 2
+            };
+            footerPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            footerPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 130));
+
+            footerPanel.Controls.Add(new Label
             {
                 Text = "Bản đồ preview sẽ cập nhật theo Latitude/Longitude",
                 Dock = DockStyle.Fill,
                 TextAlign = ContentAlignment.MiddleLeft,
                 ForeColor = Color.DimGray
-            }, 0, 2);
+            }, 0, 0);
+
+            _btnShowPoiQr.Text = "QR POI";
+            _btnShowPoiQr.Dock = DockStyle.Fill;
+            _btnShowPoiQr.Margin = new Padding(8, 2, 0, 2);
+            _btnShowPoiQr.Click += (_, _) => ShowPoiQrForCurrentSelection();
+            footerPanel.Controls.Add(_btnShowPoiQr, 1, 0);
+
+            rightRoot.Controls.Add(footerPanel, 0, 2);
 
             split.Panel2.Controls.Add(rightRoot);
 
             _tabPoiEditor.Controls.Add(split);
+        }
+
+        private void ShowPoiQrForCurrentSelection()
+        {
+            if (cmbMyPois.SelectedValue == null || !int.TryParse(cmbMyPois.SelectedValue.ToString(), out var poiId))
+            {
+                MessageBox.Show("Vui lòng chọn POI để tạo QR.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            var qrPayload = BuildPoiIntentUrl(poiId);
+
+            using var qrGenerator = new QRCodeGenerator();
+            using var qrData = qrGenerator.CreateQrCode(qrPayload, QRCodeGenerator.ECCLevel.Q);
+            using var qrCode = new QRCode(qrData);
+            var bitmap = qrCode.GetGraphic(16);
+
+            try
+            {
+                using var dialog = new Form
+                {
+                    Text = $"QR - POI #{poiId}",
+                    StartPosition = FormStartPosition.CenterParent,
+                    Width = 460,
+                    Height = 560,
+                    FormBorderStyle = FormBorderStyle.FixedDialog,
+                    MaximizeBox = false,
+                    MinimizeBox = false
+                };
+
+                var root = new TableLayoutPanel
+                {
+                    Dock = DockStyle.Fill,
+                    ColumnCount = 1,
+                    RowCount = 4,
+                    Padding = new Padding(12)
+                };
+                root.RowStyles.Add(new RowStyle(SizeType.Absolute, 24));
+                root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+                root.RowStyles.Add(new RowStyle(SizeType.Absolute, 70));
+                root.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
+
+                root.Controls.Add(new Label
+                {
+                    Dock = DockStyle.Fill,
+                    Text = "Quét QR: mở Tourist vào POI, chưa có app sẽ chuyển link tải APK",
+                    TextAlign = ContentAlignment.MiddleLeft
+                }, 0, 0);
+
+                root.Controls.Add(new PictureBox
+                {
+                    Dock = DockStyle.Fill,
+                    Image = bitmap,
+                    SizeMode = PictureBoxSizeMode.Zoom,
+                    BorderStyle = BorderStyle.FixedSingle
+                }, 0, 1);
+
+                var txtPayload = new TextBox
+                {
+                    Dock = DockStyle.Fill,
+                    ReadOnly = true,
+                    Multiline = true,
+                    Text = qrPayload,
+                    ScrollBars = ScrollBars.Vertical
+                };
+                root.Controls.Add(txtPayload, 0, 2);
+
+                var actions = new FlowLayoutPanel
+                {
+                    Dock = DockStyle.Fill,
+                    FlowDirection = FlowDirection.RightToLeft
+                };
+
+                var btnClose = new Button { Text = "Đóng", Width = 100, Height = 32 };
+                btnClose.Click += (_, _) => dialog.Close();
+
+                var btnCopy = new Button { Text = "Copy link", Width = 110, Height = 32 };
+                btnCopy.Click += (_, _) =>
+                {
+                    Clipboard.SetText(qrPayload);
+                    MessageBox.Show("Đã copy nội dung QR.", "Thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                };
+
+                actions.Controls.Add(btnClose);
+                actions.Controls.Add(btnCopy);
+                root.Controls.Add(actions, 0, 3);
+
+                dialog.Controls.Add(root);
+                dialog.ShowDialog(this);
+            }
+            finally
+            {
+                bitmap.Dispose();
+            }
+        }
+
+        private string BuildPoiIntentUrl(int poiId)
+        {
+            var fallbackUrl = Uri.EscapeDataString(_touristApkUrl);
+            return $"intent://poi/{poiId}#Intent;scheme=touristapp;package={TouristPackageName};S.browser_fallback_url={fallbackUrl};end";
         }
 
         private static void AddEditorRow(TableLayoutPanel panel, int row, Control label, Control input)
@@ -314,9 +454,10 @@ namespace POIOwner
     }} else {{
       const map = L.map('map').setView([lat, lon], 16);
       const providers = [
-        {{ url: 'https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png', attribution: '&copy; OpenStreetMap contributors' }},
-        {{ url: 'https://{{s}}.tile.openstreetmap.fr/hot/{{z}}/{{x}}/{{y}}.png', attribution: '&copy; OpenStreetMap contributors, HOT' }},
-        {{ url: 'https://{{s}}.basemaps.cartocdn.com/light_all/{{z}}/{{x}}/{{y}}.png', attribution: '&copy; OpenStreetMap contributors &copy; CARTO' }}
+        {{ url: 'https://{{s}}.basemaps.cartocdn.com/light_all/{{z}}/{{x}}/{{y}}.png', attribution: '&copy; OpenStreetMap contributors &copy; CARTO' }},
+        {{ url: 'https://{{s}}.basemaps.cartocdn.com/voyager/{{z}}/{{x}}/{{y}}.png', attribution: '&copy; OpenStreetMap contributors &copy; CARTO' }},
+        {{ url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{{z}}/{{y}}/{{x}}', attribution: 'Tiles &copy; Esri' }},
+        {{ url: 'https://{{s}}.tile.openstreetmap.fr/hot/{{z}}/{{x}}/{{y}}.png', attribution: '&copy; OpenStreetMap contributors, HOT' }}
       ];
 
       let layer = null;

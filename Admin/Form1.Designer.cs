@@ -131,7 +131,7 @@
             grpRequests.Size = new Size(1000, 517);
             grpRequests.TabIndex = 1;
             grpRequests.TabStop = false;
-            grpRequests.Text = "2) Duyệt request thêm/cập nhật POI từ POIOwner";
+            grpRequests.Text = "";
             // 
             // btnRefresh
             // 
@@ -220,7 +220,7 @@
             MinimumSize = new Size(1042, 697);
             Name = "Form1";
             StartPosition = FormStartPosition.CenterScreen;
-            Text = "Admin - Quản lý duyệt POI";
+            Text = "Admin App";
             grpLogin.ResumeLayout(false);
             grpLogin.PerformLayout();
             grpRequests.ResumeLayout(false);

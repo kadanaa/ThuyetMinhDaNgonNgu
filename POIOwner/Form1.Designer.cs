@@ -288,7 +288,7 @@
             grpRequests.Size = new Size(1160, 574);
             grpRequests.TabIndex = 1;
             grpRequests.TabStop = false;
-            grpRequests.Text = "Gửi request cho Admin";
+            grpRequests.Text = "";
             // 
             // btnRefresh
             // 

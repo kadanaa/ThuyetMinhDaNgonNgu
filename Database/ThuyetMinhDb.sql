@@ -302,31 +302,115 @@ BEGIN
 END
 GO
 
--- Insert Sample POI Owner User
-IF NOT EXISTS (SELECT * FROM [dbo].[Users] WHERE Username = 'poiowner01')
+-- Insert Sample POI Owner Users
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Users] WHERE Username = 'poiowner01')
 BEGIN
     INSERT INTO [dbo].[Users] ([Username], [PasswordHash], [Email], [FullName], [Role], [PhoneNumber], [IsActive])
-    VALUES 
-        ('poiowner01', '$2a$11$JqDHSJJPDrzMRqKYk3EJj.S0XtQNXyxxO9zKG9HxsN5qQTZSfnOTK', 'owner1@thuyetminh.vn', 'Trần Văn A', 'POIOwner', '0987654321', 1);
+    VALUES ('poiowner01', '$2a$11$JqDHSJJPDrzMRqKYk3EJj.S0XtQNXyxxO9zKG9HxsN5qQTZSfnOTK', 'owner1@thuyetminh.vn', N'Trần Văn A', 'POIOwner', '0987654321', 1);
+END
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Users] WHERE Username = 'poiowner02')
+BEGIN
+    INSERT INTO [dbo].[Users] ([Username], [PasswordHash], [Email], [FullName], [Role], [PhoneNumber], [IsActive])
+    VALUES ('poiowner02', '$2a$11$JqDHSJJPDrzMRqKYk3EJj.S0XtQNXyxxO9zKG9HxsN5qQTZSfnOTK', 'owner2@thuyetminh.vn', N'Nguyễn Thị B', 'POIOwner', '0987654322', 1);
+END
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Users] WHERE Username = 'poiowner03')
+BEGIN
+    INSERT INTO [dbo].[Users] ([Username], [PasswordHash], [Email], [FullName], [Role], [PhoneNumber], [IsActive])
+    VALUES ('poiowner03', '$2a$11$JqDHSJJPDrzMRqKYk3EJj.S0XtQNXyxxO9zKG9HxsN5qQTZSfnOTK', 'owner3@thuyetminh.vn', N'Lê Văn C', 'POIOwner', '0987654323', 1);
+END
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Users] WHERE Username = 'poiowner04')
+BEGIN
+    INSERT INTO [dbo].[Users] ([Username], [PasswordHash], [Email], [FullName], [Role], [PhoneNumber], [IsActive])
+    VALUES ('poiowner04', '$2a$11$JqDHSJJPDrzMRqKYk3EJj.S0XtQNXyxxO9zKG9HxsN5qQTZSfnOTK', 'owner4@thuyetminh.vn', N'Phạm Minh D', 'POIOwner', '0987654324', 1);
 END
 GO
 
--- Insert Sample POI Data
-INSERT INTO [dbo].[PointsOfInterest] 
-    ([POIName], [Description], [Latitude], [Longitude], [Radius], 
-     [Category], [Address], [PhoneNumber], [OwnerId], [IsApproved], [Status])
-VALUES 
-    (N'Phở Bắc Hà', 
-     N'Quán phở nổi tiếng với nước dùng được nấu trong 12 tiếng. Phục vụ phở bò ngon lành với giá hợp lý. Mở từ 5h sáng đến 11h đêm.', 
-     21.028511, 105.854100, 0.5, N'Restaurant', N'45 Hàng Mành, Hoàn Kiếm, Hà Nội', N'024 3938 1485', 2, 1, N'Active'),
+-- Insert Sample POI Data (idempotent, avoid hard-coded OwnerId)
+DECLARE @Owner01Id INT = (SELECT TOP 1 [UserId] FROM [dbo].[Users] WHERE [Username] = 'poiowner01');
+DECLARE @Owner02Id INT = (SELECT TOP 1 [UserId] FROM [dbo].[Users] WHERE [Username] = 'poiowner02');
+DECLARE @Owner03Id INT = (SELECT TOP 1 [UserId] FROM [dbo].[Users] WHERE [Username] = 'poiowner03');
+DECLARE @Owner04Id INT = (SELECT TOP 1 [UserId] FROM [dbo].[Users] WHERE [Username] = 'poiowner04');
 
-    (N'Cafe Trời Xanh', 
-     N'Cafe nhỏ xinh với không gian thoáng mát, thích hợp để học tập hoặc gặp gỡ bạn bè. Cà phê được rang tại chỗ hàng ngày. Có WiFi miễn phí và điều hòa.', 
-     21.027500, 105.853800, 0.4, N'Cafe', N'23 Cửa Bắc, Hoàn Kiếm, Hà Nội', N'024 3935 9283', 2, 1, N'Active'),
+IF @Owner01Id IS NULL SET @Owner01Id = (SELECT TOP 1 [UserId] FROM [dbo].[Users] WHERE [Role] = 'POIOwner' ORDER BY [UserId]);
+IF @Owner02Id IS NULL SET @Owner02Id = @Owner01Id;
+IF @Owner03Id IS NULL SET @Owner03Id = @Owner01Id;
+IF @Owner04Id IS NULL SET @Owner04Id = @Owner01Id;
 
-    (N'Tạp Hóa Minh Phúc', 
-     N'Cửa hàng tạp hóa đầy đủ các mặt hàng ăn uống, mỹ phẩm, nước rửa tay, mặt nạ y tế, và các sản phẩm tiêu dùng hàng ngày khác. Mở từ 6h sáng đến 11h đêm hàng ngày.', 
-     21.029000, 105.855200, 0.3, N'Shop', N'67 Hàng Bông, Hoàn Kiếm, Hà Nội', N'024 3936 2015', 2, 1, N'Active');
+IF NOT EXISTS (SELECT 1 FROM [dbo].[PointsOfInterest] WHERE [POIName] = N'Phở Bắc Hà')
+BEGIN
+    INSERT INTO [dbo].[PointsOfInterest]
+        ([POIName], [Description], [Latitude], [Longitude], [Radius], [Category], [Address], [PhoneNumber], [OwnerId], [IsApproved], [Status])
+    VALUES
+        (N'Phở Bắc Hà', N'Quán phở nổi tiếng với nước dùng được nấu trong 12 tiếng. Phục vụ phở bò ngon lành với giá hợp lý. Mở từ 5h sáng đến 11h đêm.', 21.028511, 105.854100, 0.7, N'Restaurant', N'45 Hàng Mành, Hoàn Kiếm, Hà Nội', N'024 3938 1485', @Owner01Id, 1, N'Active');
+END
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[PointsOfInterest] WHERE [POIName] = N'Cafe Trời Xanh')
+BEGIN
+    INSERT INTO [dbo].[PointsOfInterest]
+        ([POIName], [Description], [Latitude], [Longitude], [Radius], [Category], [Address], [PhoneNumber], [OwnerId], [IsApproved], [Status])
+    VALUES
+        (N'Cafe Trời Xanh', N'Cafe nhỏ xinh với không gian thoáng mát, thích hợp để học tập hoặc gặp gỡ bạn bè. Cà phê được rang tại chỗ hàng ngày. Có WiFi miễn phí và điều hòa.', 21.027500, 105.853800, 0.7, N'Cafe', N'23 Cửa Bắc, Hoàn Kiếm, Hà Nội', N'024 3935 9283', @Owner01Id, 1, N'Active');
+END
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[PointsOfInterest] WHERE [POIName] = N'Tạp Hóa Minh Phúc')
+BEGIN
+    INSERT INTO [dbo].[PointsOfInterest]
+        ([POIName], [Description], [Latitude], [Longitude], [Radius], [Category], [Address], [PhoneNumber], [OwnerId], [IsApproved], [Status])
+    VALUES
+        (N'Tạp Hóa Minh Phúc', N'Cửa hàng tạp hóa đầy đủ các mặt hàng tiêu dùng hàng ngày, mở cửa từ 6h sáng đến 11h đêm.', 21.029000, 105.855200, 0.7, N'Shop', N'67 Hàng Bông, Hoàn Kiếm, Hà Nội', N'024 3936 2015', @Owner01Id, 1, N'Active');
+END
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[PointsOfInterest] WHERE [POIName] = N'Bún Chả Hàng Quạt')
+BEGIN
+    INSERT INTO [dbo].[PointsOfInterest]
+        ([POIName], [Description], [Latitude], [Longitude], [Radius], [Category], [Address], [PhoneNumber], [OwnerId], [IsApproved], [Status])
+    VALUES
+        (N'Bún Chả Hàng Quạt', N'Quán bún chả than hoa truyền thống Hà Nội, đông khách vào buổi trưa.', 21.029410, 105.851980, 0.8, N'Restaurant', N'74 Hàng Quạt, Hoàn Kiếm, Hà Nội', N'024 3928 1158', @Owner02Id, 1, N'Active');
+END
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[PointsOfInterest] WHERE [POIName] = N'Nhà Hàng Sen Hồ Gươm')
+BEGIN
+    INSERT INTO [dbo].[PointsOfInterest]
+        ([POIName], [Description], [Latitude], [Longitude], [Radius], [Category], [Address], [PhoneNumber], [OwnerId], [IsApproved], [Status])
+    VALUES
+        (N'Nhà Hàng Sen Hồ Gươm', N'Nhà hàng phục vụ món Việt và đặc sản Hà Nội, phù hợp gia đình và khách đoàn.', 21.028150, 105.852900, 1.0, N'Restaurant', N'12 Lê Thái Tổ, Hoàn Kiếm, Hà Nội', N'024 3933 6868', @Owner02Id, 1, N'Active');
+END
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[PointsOfInterest] WHERE [POIName] = N'Cafe Phố Cổ View Đẹp')
+BEGIN
+    INSERT INTO [dbo].[PointsOfInterest]
+        ([POIName], [Description], [Latitude], [Longitude], [Radius], [Category], [Address], [PhoneNumber], [OwnerId], [IsApproved], [Status])
+    VALUES
+        (N'Cafe Phố Cổ View Đẹp', N'Quán cafe tầng thượng ngắm phố cổ và hồ, phục vụ cà phê máy và trà hoa quả.', 21.030020, 105.850750, 0.8, N'Cafe', N'17 Đinh Liệt, Hoàn Kiếm, Hà Nội', N'024 3926 8899', @Owner03Id, 1, N'Active');
+END
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[PointsOfInterest] WHERE [POIName] = N'Cửa Hàng Đặc Sản Hà Thành')
+BEGIN
+    INSERT INTO [dbo].[PointsOfInterest]
+        ([POIName], [Description], [Latitude], [Longitude], [Radius], [Category], [Address], [PhoneNumber], [OwnerId], [IsApproved], [Status])
+    VALUES
+        (N'Cửa Hàng Đặc Sản Hà Thành', N'Cửa hàng bán ô mai, trà, bánh cốm và quà tặng đặc sản địa phương cho du khách.', 21.027820, 105.856100, 0.8, N'Shop', N'52 Hàng Đào, Hoàn Kiếm, Hà Nội', N'024 3924 7766', @Owner03Id, 1, N'Active');
+END
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[PointsOfInterest] WHERE [POIName] = N'Kem Tràng Tiền Mini')
+BEGIN
+    INSERT INTO [dbo].[PointsOfInterest]
+        ([POIName], [Description], [Latitude], [Longitude], [Radius], [Category], [Address], [PhoneNumber], [OwnerId], [IsApproved], [Status])
+    VALUES
+        (N'Kem Tràng Tiền Mini', N'Điểm ăn vặt gần hồ, nổi bật với kem ốc quế và kem que vị truyền thống.', 21.025980, 105.855600, 0.9, N'Food', N'35 Tràng Tiền, Hoàn Kiếm, Hà Nội', N'024 3934 9999', @Owner04Id, 1, N'Active');
+END
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[PointsOfInterest] WHERE [POIName] = N'Đền Ngọc Sơn')
+BEGIN
+    INSERT INTO [dbo].[PointsOfInterest]
+        ([POIName], [Description], [Latitude], [Longitude], [Radius], [Category], [Address], [PhoneNumber], [OwnerId], [IsApproved], [Status])
+    VALUES
+        (N'Đền Ngọc Sơn', N'Di tích lịch sử - văn hóa nổi tiếng tại Hồ Hoàn Kiếm, thu hút đông đảo khách tham quan.', 21.028320, 105.852460, 1.2, N'Tourism', N'Hồ Hoàn Kiếm, Hoàn Kiếm, Hà Nội', NULL, @Owner04Id, 1, N'Active');
+END
+GO
 
 -- Create View for POI with Owner Information
 CREATE OR ALTER VIEW [dbo].[vw_POIWithOwner] AS

@@ -2,6 +2,8 @@
 {
     public partial class App : Application
     {
+        public static string? PendingDeepLinkUri { get; set; }
+
         // IServiceProvider được MAUI inject tự động
         public App(IServiceProvider serviceProvider)
         {

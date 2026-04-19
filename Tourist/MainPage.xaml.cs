@@ -59,10 +59,11 @@ public partial class MainPage : ContentPage
         _ = InitializeAsync();
     }
 
-    protected override void OnAppearing()
+    protected override async void OnAppearing()
     {
         base.OnAppearing();
         StartHeartbeat();
+        await TryHandlePendingDeepLinkAsync();
     }
 
     protected override void OnDisappearing()
@@ -101,11 +102,85 @@ public partial class MainPage : ContentPage
             _selectedLanguage = _availableLanguages[LanguagePicker.SelectedIndex];
 
             await SearchPoisAsync();
+            await TryHandlePendingDeepLinkAsync();
         }
         catch (Exception ex)
         {
             Debug.WriteLine($"[Init] Error: {ex.Message}");
             await DisplayAlert("Loi", $"Khong the khoi tao ung dung: {ex.Message}", "OK");
+        }
+    }
+
+    public async Task TryHandlePendingDeepLinkAsync()
+    {
+        var uri = App.PendingDeepLinkUri;
+        if (string.IsNullOrWhiteSpace(uri))
+            return;
+
+        if (!TryExtractPoiIdFromDeepLink(uri, out var poiId) || poiId <= 0)
+            return;
+
+        App.PendingDeepLinkUri = null;
+        await NavigateToPoiByIdAsync(poiId);
+    }
+
+    private static bool TryExtractPoiIdFromDeepLink(string uriText, out int poiId)
+    {
+        poiId = 0;
+        if (!Uri.TryCreate(uriText, UriKind.Absolute, out var uri))
+            return false;
+
+        if (!string.Equals(uri.Scheme, "touristapp", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        if (!string.Equals(uri.Host, "poi", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var path = uri.AbsolutePath.Trim('/');
+        return int.TryParse(path, out poiId);
+    }
+
+    private async Task NavigateToPoiByIdAsync(int poiId)
+    {
+        try
+        {
+            var poi = await _poiService.GetPOIDetailsAsync(poiId);
+            if (poi == null || !poi.IsApproved || !string.Equals(poi.Status, "Active", StringComparison.OrdinalIgnoreCase))
+            {
+                await DisplayAlert("Thông báo", "POI không tồn tại hoặc chưa được duyệt.", "OK");
+                return;
+            }
+
+            _selectedPoi = poi;
+
+            if (_currentPois.All(p => p.POIId != poi.POIId))
+            {
+                _currentPois.Add(poi);
+                PoiCollectionView.ItemsSource = null;
+                PoiCollectionView.ItemsSource = _currentPois;
+            }
+
+            var existingPin = _pinToPoiMap.FirstOrDefault(kvp => kvp.Value.POIId == poi.POIId).Key;
+            if (existingPin == null)
+            {
+                var pin = new Pin
+                {
+                    Label = poi.POIName,
+                    Address = poi.Category ?? string.Empty,
+                    Location = new Location((double)poi.Latitude, (double)poi.Longitude),
+                    Type = PinType.Place
+                };
+                pin.MarkerClicked += OnMapPinClicked;
+                _pinToPoiMap[pin] = poi;
+                touristMap.Pins.Add(pin);
+            }
+
+            await FocusPoiAsync(poi);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[DeepLink] {ex}");
+            await DisplayAlert("Lỗi", $"Không thể mở POI từ QR: {ex.Message}", "OK");
         }
     }
 

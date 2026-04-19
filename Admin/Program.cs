@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Configuration;
+
 namespace Admin
 {
     internal static class Program
@@ -11,7 +13,16 @@ namespace Admin
             // To customize application configuration such as set high DPI settings or default font,
             // see https://aka.ms/applicationconfiguration.
             ApplicationConfiguration.Initialize();
-            Application.Run(new Form1());
+
+            var configuration = new ConfigurationBuilder()
+                .SetBasePath(AppContext.BaseDirectory)
+                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+                .Build();
+
+            var connectionString = configuration.GetConnectionString("ThuyetMinhDb")
+                ?? throw new InvalidOperationException("Missing connection string 'ConnectionStrings:ThuyetMinhDb' in appsettings.json.");
+
+            Application.Run(new Form1(connectionString));
         }
     }
 }

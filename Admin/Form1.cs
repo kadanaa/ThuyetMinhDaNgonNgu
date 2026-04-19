@@ -8,8 +8,7 @@ namespace Admin
 {
     public partial class Form1 : Form
     {
-        private readonly string _connectionString =
-            "Server=localhost;Database=ThuyetMinhDaNgonNgu;Integrated Security=true;TrustServerCertificate=true;Connection Timeout=30;";
+        private readonly string _connectionString;
 
         private int _currentAdminId;
         private readonly TabControl _mainTabControl = new() { Dock = DockStyle.Fill };
@@ -22,8 +21,9 @@ namespace Admin
         private readonly WebView2 _statisticsMap = new() { Dock = DockStyle.Fill };
         private bool _statisticsUiInitialized;
 
-        public Form1()
+        public Form1(string connectionString)
         {
+            _connectionString = connectionString;
             InitializeComponent();
             grpLogin.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             grpRequests.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
@@ -591,6 +591,8 @@ WHERE [IsActive] = 1
 
         private async Task RenderStatisticsMapAsync(DataTable table, List<TouristMapMarker> activeTouristLocations)
         {
+            await _statisticsMap.EnsureCoreWebView2Async();
+
             if (table.Rows.Count == 0)
             {
                 _statisticsMap.NavigateToString("<html><body style='font-family:Segoe UI;padding:16px'>Không có POI để hiển thị bản đồ.</body></html>");
@@ -625,7 +627,6 @@ WHERE [IsActive] = 1
             var touristMarkersJson = JsonSerializer.Serialize(activeTouristLocations);
             var html = BuildStatisticsMapHtml(markersJson, touristMarkersJson);
 
-            await _statisticsMap.EnsureCoreWebView2Async();
             _statisticsMap.NavigateToString(html);
         }
 

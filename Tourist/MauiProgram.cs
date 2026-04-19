@@ -1,6 +1,8 @@
 ﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Maui.Controls.Hosting;
 using Microsoft.Maui.Maps;
+using Microsoft.Maui.Storage;
 using Tourist.Data;
 using Tourist.Services;
 
@@ -12,6 +14,11 @@ namespace Tourist
         {
             var builder = MauiApp.CreateBuilder();
 
+            using (var stream = FileSystem.OpenAppPackageFileAsync("appsettings.json").GetAwaiter().GetResult())
+            {
+                builder.Configuration.AddJsonStream(stream);
+            }
+
             builder
                 .UseMauiApp<App>()
                 .ConfigureFonts(fonts =>
@@ -21,7 +28,7 @@ namespace Tourist
                 })
                 .UseMauiMaps();
 
-            var connectionString = GetConnectionString();
+            var connectionString = GetConnectionString(builder.Configuration);
             builder.Services.AddTransient(_ => new ThuyetMinhDbContext(connectionString));
 
             builder.Services.AddTransient<IPoiService, PoiService>();
@@ -38,26 +45,14 @@ namespace Tourist
             return builder.Build();
         }
 
-        private static string GetConnectionString()
+        private static string GetConnectionString(IConfiguration configuration)
         {
 #if WINDOWS
-            // Chay tren Windows: dung Windows Authentication, khong can user/pass
-            return "Server=localhost;" +
-                   "Database=ThuyetMinhDaNgonNgu;" +
-                   "Integrated Security=true;" +
-                   "TrustServerCertificate=true;" +
-                   "Connection Timeout=30;";
+            return configuration.GetConnectionString("ThuyetMinhDbWindows")
+                ?? throw new InvalidOperationException("Missing connection string 'ConnectionStrings:ThuyetMinhDbWindows' in Tourist appsettings.json.");
 #else
-            // Chay tren Android Emulator:
-            // 10.0.2.2 la dia chi dac biet tro ve localhost cua may tinh
-            // Neu dung thiet bi that: thay bang IP WiFi cua may (vd: 192.168.1.5)
-            return "Server=10.0.2.2;" + Environment.NewLine +
-                   "Database=ThuyetMinhDaNgonNgu;" +
-                   "User Id=sa;" +
-                   "Password=sa@123456;" +
-                   "TrustServerCertificate=true;" +
-                   "Connection Timeout=60;" +
-                   "MultipleActiveResultSets=true;";
+            return configuration.GetConnectionString("ThuyetMinhDbMobile")
+                ?? throw new InvalidOperationException("Missing connection string 'ConnectionStrings:ThuyetMinhDbMobile' in Tourist appsettings.json.");
 #endif
         }
     }
