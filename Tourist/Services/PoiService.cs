@@ -56,6 +56,7 @@ namespace Tourist.Services
             try
             {
                 var allPois = await _context.PointsOfInterest
+                    .AsNoTracking()
                     .Where(p => p.IsApproved && p.Status == "Active")
                     .ToListAsync();
 

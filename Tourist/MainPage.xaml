@@ -74,6 +74,22 @@
             </StackLayout>
         </Frame>
 
+        <Button x:Name="ReloadTopButton"
+                Text="↻"
+                Clicked="OnRefresh"
+                WidthRequest="42"
+                HeightRequest="42"
+                CornerRadius="21"
+                FontSize="20"
+                BackgroundColor="White"
+                TextColor="#1A73E8"
+                BorderColor="#D0D0D0"
+                BorderWidth="1"
+                HorizontalOptions="End"
+                VerticalOptions="Start"
+                Margin="0,48,12,0"
+                ZIndex="30" />
+
         <!-- BOTTOM SHEET -->
         <Frame x:Name="BottomSheet"
                BackgroundColor="White"

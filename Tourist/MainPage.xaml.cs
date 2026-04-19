@@ -254,8 +254,7 @@ public partial class MainPage : ContentPage
             if (LocationPicker.SelectedIndex < locations.Count)
             {
                 var loc = locations[LocationPicker.SelectedIndex];
-                _locationService.SetSimulatedLocation(loc.latitude, loc.longitude);
-                await SearchPoisAsync();
+                await ApplyStandingLocationAndSearchAsync(loc.latitude, loc.longitude);
             }
         }
         catch (Exception ex)
@@ -277,19 +276,37 @@ public partial class MainPage : ContentPage
         {
             var latitude = Math.Round((decimal)e.Location.Latitude, 8, MidpointRounding.AwayFromZero);
             var longitude = Math.Round((decimal)e.Location.Longitude, 8, MidpointRounding.AwayFromZero);
-
-            _locationService.SetSimulatedLocation(latitude, longitude);
-            _currentLat = latitude;
-            _currentLon = longitude;
-
-            UpdateSelectedLocationDot(latitude, longitude);
-
-            await SearchPoisAsync();
+            await ApplyStandingLocationAndSearchAsync(latitude, longitude);
         }
         catch (Exception ex)
         {
             Debug.WriteLine($"[MapClicked] {ex.Message}");
         }
+    }
+
+    private async Task ApplyStandingLocationAndSearchAsync(decimal latitude, decimal longitude)
+    {
+        _locationService.SetSimulatedLocation(latitude, longitude);
+        _currentLat = latitude;
+        _currentLon = longitude;
+        _selectedPoi = null;
+        PoiCollectionView.SelectedItem = null;
+
+        UpdateSelectedLocationDot(latitude, longitude);
+        var targetCenter = new Location((double)latitude, (double)longitude);
+        if (touristMap.VisibleRegion != null)
+        {
+            touristMap.MoveToRegion(new MapSpan(
+                targetCenter,
+                touristMap.VisibleRegion.LatitudeDegrees,
+                touristMap.VisibleRegion.LongitudeDegrees));
+        }
+        else
+        {
+            MoveMapToRegion(targetCenter, _currentMapRadiusKm);
+        }
+
+        await SearchPoisAsync(autoExpandBottomSheet: false, keepCurrentZoom: true, moveMapToCurrentLocation: false);
     }
 
     private void UpdateSelectedLocationDot(decimal latitude, decimal longitude)
@@ -312,18 +329,37 @@ public partial class MainPage : ContentPage
     // ----------------------------------------------------------------
     // Tim POI: distance(tourist, POI) <= POI.Radius
     // ----------------------------------------------------------------
-    private async Task SearchPoisAsync()
+    private async Task SearchPoisAsync(bool autoExpandBottomSheet = true, bool keepCurrentZoom = false, bool moveMapToCurrentLocation = true)
     {
         try
         {
             LoadingOverlay.IsVisible = true;
             SearchButton.IsEnabled = false;
             PoiCollectionView.ItemsSource = null;
+            PoiCollectionView.SelectedItem = null;
 
             (_currentLat, _currentLon) = await _locationService.GetCurrentLocationAsync();
             await _touristIdentityService.UpdateCurrentLocationAsync(_currentLat, _currentLon);
+            UpdateSelectedLocationDot(_currentLat, _currentLon);
 
-            MoveMapToRegion(new Location((double)_currentLat, (double)_currentLon), 1d);
+            if (moveMapToCurrentLocation)
+            {
+                var mapRadiusKm = 1d;
+                if (keepCurrentZoom)
+                {
+                    mapRadiusKm = _currentMapRadiusKm;
+                    if (touristMap.VisibleRegion != null)
+                    {
+                        var visibleRadiusKm = (touristMap.VisibleRegion.LatitudeDegrees * 111d) / 2d;
+                        if (double.IsFinite(visibleRadiusKm) && visibleRadiusKm > 0.05d)
+                        {
+                            mapRadiusKm = visibleRadiusKm;
+                        }
+                    }
+                }
+
+                MoveMapToRegion(new Location((double)_currentLat, (double)_currentLon), mapRadiusKm);
+            }
 
             touristMap.Pins.Clear();
             _pinToPoiMap.Clear();
@@ -346,8 +382,9 @@ public partial class MainPage : ContentPage
             }
 
             PoiCollectionView.ItemsSource = _currentPois;
+            PoiCollectionView.SelectedItem = null;
 
-            if (_currentPois.Count > 0)
+            if (autoExpandBottomSheet && _currentPois.Count > 0)
                 await BottomSheet.TranslateTo(0, BottomSheetExpandedY, 220, Easing.CubicOut);
         }
         catch (Exception ex)

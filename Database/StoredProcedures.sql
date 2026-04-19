@@ -309,11 +309,13 @@ CREATE OR ALTER PROCEDURE [dbo].[sp_ApprovePOIRequest]
     BEGIN
         DECLARE @POIId INT;
         DECLARE @RequestType NVARCHAR(50);
+        DECLARE @RequestData NVARCHAR(MAX);
 
         -- Get POI ID from request
         SELECT
             @POIId = [POIId],
-            @RequestType = [RequestType]
+            @RequestType = [RequestType],
+            @RequestData = [RequestData]
         FROM [dbo].[POIApprovalRequests]
         WHERE [RequestId] = @RequestId;
 
@@ -332,6 +334,26 @@ CREATE OR ALTER PROCEDURE [dbo].[sp_ApprovePOIRequest]
             UPDATE [dbo].[PointsOfInterest]
             SET
                 [IsApproved] = 0,
+                [LastModifiedDate] = GETUTCDATE()
+            WHERE [POIId] = @POIId;
+        END
+        ELSE IF @RequestType = 'Update'
+        BEGIN
+            UPDATE [dbo].[PointsOfInterest]
+            SET
+                [POIName] = COALESCE(JSON_VALUE(@RequestData, '$.POIName'), [POIName]),
+                [Description] = COALESCE(JSON_VALUE(@RequestData, '$.Description'), [Description]),
+                [Latitude] = COALESCE(TRY_CAST(JSON_VALUE(@RequestData, '$.Latitude') AS DECIMAL(10, 8)), [Latitude]),
+                [Longitude] = COALESCE(TRY_CAST(JSON_VALUE(@RequestData, '$.Longitude') AS DECIMAL(11, 8)), [Longitude]),
+                [Radius] = COALESCE(TRY_CAST(JSON_VALUE(@RequestData, '$.Radius') AS FLOAT), [Radius]),
+                [Category] = COALESCE(JSON_VALUE(@RequestData, '$.Category'), [Category]),
+                [Address] = COALESCE(JSON_VALUE(@RequestData, '$.Address'), [Address]),
+                [PhoneNumber] = COALESCE(JSON_VALUE(@RequestData, '$.PhoneNumber'), [PhoneNumber]),
+                [Website] = COALESCE(JSON_VALUE(@RequestData, '$.Website'), [Website]),
+                [IsApproved] = 1,
+                [ApprovedDate] = GETUTCDATE(),
+                [ApprovedBy] = @AdminId,
+                [Status] = 'Active',
                 [LastModifiedDate] = GETUTCDATE()
             WHERE [POIId] = @POIId;
         END

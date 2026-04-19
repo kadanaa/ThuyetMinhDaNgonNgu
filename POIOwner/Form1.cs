@@ -2,6 +2,7 @@ using System.Data;
 using System.Globalization;
 using System.Text.Json;
 using Microsoft.Data.SqlClient;
+using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 using QRCoder;
 
@@ -19,7 +20,18 @@ namespace POIOwner
         private readonly TabPage _tabPoiEditor = new() { Text = "POI & Bản đồ" };
         private readonly WebView2 _poiPreviewMap = new() { Dock = DockStyle.Fill };
         private readonly Button _btnShowPoiQr = new();
+        private readonly TabControl _poiActionTabs = new() { Dock = DockStyle.Fill };
+        private readonly TextBox _txtCreatePoiName = new();
+        private readonly TextBox _txtCreateDescription = new();
+        private readonly TextBox _txtCreateLatitude = new();
+        private readonly TextBox _txtCreateLongitude = new();
+        private readonly TextBox _txtCreateRadius = new();
+        private readonly TextBox _txtCreateCategory = new();
+        private readonly TextBox _txtCreateAddress = new();
+        private readonly TextBox _txtCreatePhone = new();
+        private readonly TextBox _txtCreateWebsite = new();
         private bool _responsiveLayoutInitialized;
+        private bool _poiMapBridgeInitialized;
 
         public Form1(string connectionString, string touristApkUrl)
         {
@@ -56,6 +68,8 @@ namespace POIOwner
 
             txtLatitude.TextChanged += async (_, _) => await RefreshPoiPreviewMapAsync();
             txtLongitude.TextChanged += async (_, _) => await RefreshPoiPreviewMapAsync();
+            _txtCreateLatitude.TextChanged += async (_, _) => await RefreshPoiPreviewMapAsync();
+            _txtCreateLongitude.TextChanged += async (_, _) => await RefreshPoiPreviewMapAsync();
         }
 
         private void SetupRequestsTabLayout()
@@ -207,17 +221,21 @@ namespace POIOwner
             leftRoot.Controls.Add(new Label { Text = "Liên hệ", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft }, 0, 5);
             leftRoot.Controls.Add(phoneWebsitePanel, 1, 5);
 
-            var actionPanel = new TableLayoutPanel
+            var updateDeleteTab = new TabPage("Sửa / Xóa");
+            var createTab = new TabPage("Tạo POI mới");
+
+            var updateDeletePanel = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
                 ColumnCount = 3,
-                RowCount = 2
+                RowCount = 2,
+                Padding = new Padding(6)
             };
-            actionPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 45));
-            actionPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 27.5f));
-            actionPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 27.5f));
-            actionPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
-            actionPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
+            updateDeletePanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 45));
+            updateDeletePanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 27.5f));
+            updateDeletePanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 27.5f));
+            updateDeletePanel.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
+            updateDeletePanel.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
 
             var deleteReasonPanel = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2 };
             deleteReasonPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 24));
@@ -228,23 +246,115 @@ namespace POIOwner
             txtDeleteReason.Multiline = true;
             deleteReasonPanel.Controls.Add(lblDeleteReason, 0, 0);
             deleteReasonPanel.Controls.Add(txtDeleteReason, 0, 1);
-            actionPanel.SetRowSpan(deleteReasonPanel, 2);
-            actionPanel.Controls.Add(deleteReasonPanel, 0, 0);
+            updateDeletePanel.SetRowSpan(deleteReasonPanel, 2);
+            updateDeletePanel.Controls.Add(deleteReasonPanel, 0, 0);
 
             btnSendDeleteRequest.Dock = DockStyle.Fill;
             btnSendDeleteRequest.Margin = new Padding(6, 4, 6, 4);
-            actionPanel.Controls.Add(btnSendDeleteRequest, 1, 0);
+            updateDeletePanel.Controls.Add(btnSendDeleteRequest, 1, 0);
 
             btnSendUpdateRequest.Dock = DockStyle.Fill;
             btnSendUpdateRequest.Margin = new Padding(6, 4, 6, 4);
-            actionPanel.Controls.Add(btnSendUpdateRequest, 2, 0);
+            updateDeletePanel.Controls.Add(btnSendUpdateRequest, 2, 0);
+
+            updateDeleteTab.Controls.Add(updateDeletePanel);
+
+            var createPanel = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 2,
+                RowCount = 7,
+                Padding = new Padding(12)
+            };
+            createPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 120));
+            createPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            createPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
+            createPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
+            createPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
+            createPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
+            createPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
+            createPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
+            createPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+
+            _txtCreateDescription.Multiline = true;
+
+            AddEditorRow(createPanel, 0, new Label { Text = "Tên POI" }, _txtCreatePoiName);
+            AddEditorRow(createPanel, 1, new Label { Text = "Mô tả" }, _txtCreateDescription);
+
+            var createLatLon = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 4 };
+            createLatLon.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 70));
+            createLatLon.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            createLatLon.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 80));
+            createLatLon.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            createLatLon.Controls.Add(new Label { Text = "Vĩ độ", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft }, 0, 0);
+            _txtCreateLatitude.Dock = DockStyle.Fill;
+            createLatLon.Controls.Add(_txtCreateLatitude, 1, 0);
+            createLatLon.Controls.Add(new Label { Text = "Kinh độ", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft }, 2, 0);
+            _txtCreateLongitude.Dock = DockStyle.Fill;
+            createLatLon.Controls.Add(_txtCreateLongitude, 3, 0);
+            createPanel.Controls.Add(new Label { Text = "Tọa độ", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft }, 0, 2);
+            createPanel.Controls.Add(createLatLon, 1, 2);
+
+            var createMeta = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 4 };
+            createMeta.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 70));
+            createMeta.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            createMeta.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 80));
+            createMeta.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            createMeta.Controls.Add(new Label { Text = "Bán kính", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft }, 0, 0);
+            _txtCreateRadius.Dock = DockStyle.Fill;
+            createMeta.Controls.Add(_txtCreateRadius, 1, 0);
+            createMeta.Controls.Add(new Label { Text = "Danh mục", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft }, 2, 0);
+            _txtCreateCategory.Dock = DockStyle.Fill;
+            createMeta.Controls.Add(_txtCreateCategory, 3, 0);
+            createPanel.Controls.Add(new Label { Text = "Thông số", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft }, 0, 3);
+            createPanel.Controls.Add(createMeta, 1, 3);
+
+            AddEditorRow(createPanel, 4, new Label { Text = "Địa chỉ" }, _txtCreateAddress);
+
+            var createContact = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 4 };
+            createContact.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 70));
+            createContact.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            createContact.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 80));
+            createContact.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            createContact.Controls.Add(new Label { Text = "Điện thoại", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft }, 0, 0);
+            _txtCreatePhone.Dock = DockStyle.Fill;
+            createContact.Controls.Add(_txtCreatePhone, 1, 0);
+            createContact.Controls.Add(new Label { Text = "Trang web", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft }, 2, 0);
+            _txtCreateWebsite.Dock = DockStyle.Fill;
+            createContact.Controls.Add(_txtCreateWebsite, 3, 0);
+            createPanel.Controls.Add(new Label { Text = "Liên hệ", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft }, 0, 5);
+            createPanel.Controls.Add(createContact, 1, 5);
+
+            var createActions = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 1,
+                RowCount = 2
+            };
+            createActions.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            createActions.RowStyles.Add(new RowStyle(SizeType.Absolute, 52));
+
+            createActions.Controls.Add(new Label
+            {
+                Text = "Nhập thông tin POI bên trên, chọn tọa độ bằng cách nhấp bản đồ, rồi gửi request tạo mới.",
+                Dock = DockStyle.Fill,
+                TextAlign = ContentAlignment.MiddleLeft,
+                ForeColor = Color.DimGray
+            }, 0, 0);
 
             btnSendCreateRequest.Dock = DockStyle.Fill;
             btnSendCreateRequest.Margin = new Padding(6, 4, 6, 4);
-            actionPanel.SetColumnSpan(btnSendCreateRequest, 2);
-            actionPanel.Controls.Add(btnSendCreateRequest, 1, 1);
+            createActions.Controls.Add(btnSendCreateRequest, 0, 1);
+            createPanel.Controls.Add(createActions, 1, 6);
 
-            leftRoot.Controls.Add(actionPanel, 1, 6);
+            createTab.Controls.Add(createPanel);
+
+            _poiActionTabs.TabPages.Clear();
+            _poiActionTabs.TabPages.Add(updateDeleteTab);
+            _poiActionTabs.TabPages.Add(createTab);
+            _poiActionTabs.SelectedIndexChanged += async (_, _) => await RefreshPoiPreviewMapAsync();
+
+            leftRoot.Controls.Add(_poiActionTabs, 1, 6);
 
             split.Panel1.Controls.Add(leftRoot);
 
@@ -282,13 +392,13 @@ namespace POIOwner
 
             footerPanel.Controls.Add(new Label
             {
-                Text = "Bản đồ preview sẽ cập nhật theo Latitude/Longitude",
+                Text = "Nhấp vào bản đồ để chọn tọa độ (vĩ độ/kinh độ)",
                 Dock = DockStyle.Fill,
                 TextAlign = ContentAlignment.MiddleLeft,
                 ForeColor = Color.DimGray
             }, 0, 0);
 
-            _btnShowPoiQr.Text = "QR POI";
+            _btnShowPoiQr.Text = "Mã QR POI";
             _btnShowPoiQr.Dock = DockStyle.Fill;
             _btnShowPoiQr.Margin = new Padding(8, 2, 0, 2);
             _btnShowPoiQr.Click += (_, _) => ShowPoiQrForCurrentSelection();
@@ -344,7 +454,7 @@ namespace POIOwner
                 root.Controls.Add(new Label
                 {
                     Dock = DockStyle.Fill,
-                    Text = "Quét QR: mở Tourist vào POI, chưa có app sẽ chuyển link tải APK",
+                    Text = "Quét mã QR: mở Tourist vào POI, nếu chưa có ứng dụng sẽ chuyển sang liên kết tải APK",
                     TextAlign = ContentAlignment.MiddleLeft
                 }, 0, 0);
 
@@ -375,7 +485,7 @@ namespace POIOwner
                 var btnClose = new Button { Text = "Đóng", Width = 100, Height = 32 };
                 btnClose.Click += (_, _) => dialog.Close();
 
-                var btnCopy = new Button { Text = "Copy link", Width = 110, Height = 32 };
+                var btnCopy = new Button { Text = "Sao chép liên kết", Width = 130, Height = 32 };
                 btnCopy.Click += (_, _) =>
                 {
                     Clipboard.SetText(qrPayload);
@@ -414,21 +524,119 @@ namespace POIOwner
 
         private async Task RefreshPoiPreviewMapAsync()
         {
-            if (!decimal.TryParse(txtLatitude.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out var lat) &&
-                !decimal.TryParse(txtLatitude.Text, NumberStyles.Float, CultureInfo.CurrentCulture, out lat))
+            var (latInput, lonInput) = GetActiveCoordinateInputs();
+
+            if (!decimal.TryParse(latInput.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out var lat) &&
+                !decimal.TryParse(latInput.Text, NumberStyles.Float, CultureInfo.CurrentCulture, out lat))
             {
                 return;
             }
 
-            if (!decimal.TryParse(txtLongitude.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out var lon) &&
-                !decimal.TryParse(txtLongitude.Text, NumberStyles.Float, CultureInfo.CurrentCulture, out lon))
+            if (!decimal.TryParse(lonInput.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out var lon) &&
+                !decimal.TryParse(lonInput.Text, NumberStyles.Float, CultureInfo.CurrentCulture, out lon))
             {
                 return;
             }
 
             await _poiPreviewMap.EnsureCoreWebView2Async();
-            var html = BuildPoiPreviewMapHtml((double)lat, (double)lon, txtPoiName.Text.Trim());
+            EnsurePoiPreviewMapBridge();
+            var activePoiName = GetActivePoiNameInput().Text.Trim();
+            var html = BuildPoiPreviewMapHtml((double)lat, (double)lon, activePoiName);
             _poiPreviewMap.NavigateToString(html);
+        }
+
+        private TextBox GetActivePoiNameInput()
+        {
+            return _poiActionTabs.SelectedIndex == 1 ? _txtCreatePoiName : txtPoiName;
+        }
+
+        private (TextBox lat, TextBox lon) GetActiveCoordinateInputs()
+        {
+            return _poiActionTabs.SelectedIndex == 1
+                ? (_txtCreateLatitude, _txtCreateLongitude)
+                : (txtLatitude, txtLongitude);
+        }
+
+        private void EnsurePoiPreviewMapBridge()
+        {
+            if (_poiMapBridgeInitialized || _poiPreviewMap.CoreWebView2 == null)
+                return;
+
+            _poiPreviewMap.CoreWebView2.WebMessageReceived += PoiPreviewMap_WebMessageReceived;
+            _poiMapBridgeInitialized = true;
+        }
+
+        private void PoiPreviewMap_WebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(e.WebMessageAsJson);
+                var root = doc.RootElement;
+
+                if (!root.TryGetProperty("type", out var typeProp) ||
+                    !string.Equals(typeProp.GetString(), "map-click", StringComparison.OrdinalIgnoreCase))
+                    return;
+
+                if (!root.TryGetProperty("latitude", out var latProp) ||
+                    !root.TryGetProperty("longitude", out var lonProp))
+                    return;
+
+                var latitude = latProp.GetDouble();
+                var longitude = lonProp.GetDouble();
+
+                var (latInput, lonInput) = GetActiveCoordinateInputs();
+                latInput.Text = latitude.ToString("F8", CultureInfo.InvariantCulture);
+                lonInput.Text = longitude.ToString("F8", CultureInfo.InvariantCulture);
+            }
+            catch
+            {
+                // Ignore malformed map messages.
+            }
+        }
+
+        private bool TryGetCreatePoiInputFromCreateTab(out CreatePoiInput input, out string message)
+        {
+            input = new CreatePoiInput();
+            message = string.Empty;
+
+            if (string.IsNullOrWhiteSpace(_txtCreatePoiName.Text))
+            {
+                message = "Tên POI là bắt buộc.";
+                return false;
+            }
+
+            if (!TryParseDecimal(_txtCreateLatitude.Text, out var lat))
+            {
+                message = "Latitude không hợp lệ.";
+                return false;
+            }
+
+            if (!TryParseDecimal(_txtCreateLongitude.Text, out var lon))
+            {
+                message = "Longitude không hợp lệ.";
+                return false;
+            }
+
+            if (!TryParseDouble(_txtCreateRadius.Text, out var radius) || radius <= 0)
+            {
+                message = "Radius phải > 0.";
+                return false;
+            }
+
+            input = new CreatePoiInput
+            {
+                PoiName = _txtCreatePoiName.Text.Trim(),
+                Description = _txtCreateDescription.Text.Trim(),
+                Latitude = lat,
+                Longitude = lon,
+                Radius = radius,
+                Category = _txtCreateCategory.Text.Trim(),
+                Address = _txtCreateAddress.Text.Trim(),
+                PhoneNumber = _txtCreatePhone.Text.Trim(),
+                Website = _txtCreateWebsite.Text.Trim()
+            };
+
+            return true;
         }
 
         private static string BuildPoiPreviewMapHtml(double latitude, double longitude, string poiName)
@@ -490,7 +698,28 @@ namespace POIOwner
 
       applyLayer(0);
 
-      L.marker([lat, lon]).addTo(map).bindPopup('{safeName}').openPopup();
+      let currentMarker = null;
+
+      function setMarkerAndNotify(markerLat, markerLon, shouldNotify) {{
+        if (currentMarker) map.removeLayer(currentMarker);
+        currentMarker = L.marker([markerLat, markerLon]).addTo(map).bindPopup('{safeName}').openPopup();
+
+        if (shouldNotify && window.chrome && window.chrome.webview) {{
+          window.chrome.webview.postMessage({{
+            type: 'map-click',
+            latitude: markerLat,
+            longitude: markerLon
+          }});
+        }}
+      }}
+
+      setMarkerAndNotify(lat, lon, false);
+
+      map.on('click', function(e) {{
+        const markerLat = Number(e.latlng.lat);
+        const markerLon = Number(e.latlng.lng);
+        setMarkerAndNotify(markerLat, markerLon, true);
+      }});
     }}
   </script>
 </body>
@@ -743,7 +972,7 @@ namespace POIOwner
 
         private async void btnSendCreateRequest_Click(object sender, EventArgs e)
         {
-            if (!TryGetCreatePoiInput(out var input, out var message))
+            if (!TryGetCreatePoiInputFromCreateTab(out var input, out var message))
             {
                 MessageBox.Show(message, "Dữ liệu chưa hợp lệ", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
@@ -1067,6 +1296,16 @@ ORDER BY [RequestedDate] DESC";
 
         private void ClearCreateForm()
         {
+            _txtCreatePoiName.Clear();
+            _txtCreateDescription.Clear();
+            _txtCreateLatitude.Clear();
+            _txtCreateLongitude.Clear();
+            _txtCreateRadius.Clear();
+            _txtCreateCategory.Clear();
+            _txtCreateAddress.Clear();
+            _txtCreatePhone.Clear();
+            _txtCreateWebsite.Clear();
+
             txtPoiName.Clear();
             txtDescription.Clear();
             txtLatitude.Clear();
