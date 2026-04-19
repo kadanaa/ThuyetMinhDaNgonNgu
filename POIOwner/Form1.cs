@@ -516,8 +516,7 @@ namespace POIOwner
                 return $"{_touristQrBridgeUrl}{separator}poi={poiId}&apk={escapedApkUrl}";
             }
 
-            var fallbackUrl = Uri.EscapeDataString(_touristApkUrl);
-            return $"intent://poi/{poiId}#Intent;scheme=touristapp;package={TouristPackageName};S.browser_fallback_url={fallbackUrl};end";
+            return _touristApkUrl;
         }
 
         private static void AddEditorRow(TableLayoutPanel panel, int row, Control label, Control input)
